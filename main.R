@@ -110,17 +110,22 @@ type_cat_root <- function(type) {
 }
 
 # types root from uni_diff in mot_uni_cat
+type_to_root <- function(df) {
+  df %>%
+    mutate(types_root = uni_diff %>%
+             sapply(function(x) {
+               sapply(x, type_cat_root)
+             }) %>%
+             sapply(function(x) {
+               x %>%
+                 unlist() %>%
+                 unique() %>%
+                 sort()
+             }))
+} 
+
 mot_uni_cat %<>%
-  mutate(types_root = uni_diff %>%
-           sapply(function(x) {
-             sapply(x, type_cat_root)
-           }) %>%
-           sapply(function(x) {
-             x %>%
-               unlist() %>%
-               unique() %>%
-               sort()
-           }))
+  type_to_root()
 
 # redo unique types in types_root
 mot_uni_cat %<>%
@@ -130,80 +135,116 @@ mot_uni_cat %<>%
   })
 
 # assign cat from mot_mor_uni
-mot_uni_cat %<>%
-  mutate(cat = types_root %>%
-           sapply(function(x) {
-             mot_mor_uni$cat[fmatch(x, mot_mor_uni$word)] %>%
-               (function(y) {
-                 y[unlist(lapply(y , is.null))] <- NA 
-                 y %>% 
-                   unlist()
-               })
-           })) %>%
-  mutate(cat_prop = lapply(cat, function(x) {
-    x <- table(x)
-    perc <- prop.table(x) * 100
-    
-    cats <- c("N", "V", "ADJ", "ADV", "PRO")
-    
-    x[names(x) %in% cats] %>%
-      sort(decreasing = TRUE) %>%
-      (function(x) {
-        cats <- names(x)
-        
-        x <- tibble(cat = names(x), freq = x, perc = perc[cats])
-        x[x == "N"] <- "NOUN"
-        x[x == "V"] <- "VERB"
-        x[x == "PRO"] <- "PRON"
-        x
-      }) %>%
-      mutate(freq = as.numeric(freq),
-             perc = as.numeric(perc))
-  }))  %>%
-  mutate(noun_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "NOUN")]}),
-         verb_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "VERB")]}),
-         pron_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "PRON")]}),
-         adj_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "ADJ")]}),
-         adv_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "ADV")]})) %>%
-  select(-cat_prop) %>%
-  mutate(adv_perc = sapply(adv_perc, function(x) {
-    ifelse(length(x) == 0, 0, x)
-  }),
-  pron_perc = sapply(pron_perc, function(x) {
-    ifelse(length(x) == 0, 0, x)
-  })) %>%
-  group_by(baby) %>%
-  mutate(noun_perc_cum = cumsum(noun_perc),
-         verb_perc_cum = cumsum(verb_perc),
-         adj_perc_cum = cumsum(adj_perc),
-         adv_perc_cum = cumsum(adv_perc),
-         pron_perc_cum = cumsum(pron_perc)) %>%
-  group_by(baby) %>%
-  mutate(noun_perc_cum = ( noun_perc_cum / seq(100, 2000, by = 100) ) * 100,
-         verb_perc_cum = ( verb_perc_cum / seq(100, 2000, by = 100) ) * 100,
-         adj_perc_cum = ( adj_perc_cum / seq(100, 2000, by = 100)  ) * 100,
-         adv_perc_cum = ( adv_perc_cum / seq(100, 2000, by = 100) ) * 100,
-         pron_perc_cum = ( pron_perc_cum / seq(100, 2000, by = 100) ) * 100)
+assign_cat <- function(df) {
+  df %>%
+    mutate(cat = types_root %>%
+             sapply(function(x) {
+               mot_mor_uni$cat[fmatch(x, mot_mor_uni$word)] %>%
+                 (function(y) {
+                   y[unlist(lapply(y , is.null))] <- NA 
+                   y %>% 
+                     unlist()
+                 })
+             })) %>%
+    mutate(cat_prop = lapply(cat, function(x) {
+      x <- table(x)
+      perc <- prop.table(x) * 100
+      
+      cats <- c("N", "V", "ADJ", "ADV", "PRO")
+      
+      x[names(x) %in% cats] %>%
+        sort(decreasing = TRUE) %>%
+        (function(x) {
+          cats <- names(x)
+          
+          x <- tibble(cat = names(x), freq = x, perc = perc[cats])
+          x[x == "N"] <- "NOUN"
+          x[x == "V"] <- "VERB"
+          x[x == "PRO"] <- "PRON"
+          x
+        }) %>%
+        mutate(freq = as.numeric(freq),
+               perc = as.numeric(perc))
+    }))  %>%
+    ungroup() %>%
+    mutate(noun_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "NOUN")]}),
+           verb_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "VERB")]}),
+           pron_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "PRON")]}),
+           adj_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "ADJ")]}),
+           adv_perc = sapply(cat_prop, function(x) {x$perc[which(x$cat == "ADV")]})) %>%
+    select(-cat_prop) %>%
+    mutate(adv_perc = sapply(adv_perc, function(x) {
+      ifelse(length(x) == 0, 0, x)
+    }),
+    pron_perc = sapply(pron_perc, function(x) {
+      ifelse(length(x) == 0, 0, x)
+    }),
+    adj_perc = sapply(adj_perc, function(x) {
+      ifelse(length(x) == 0, 0, x)
+    })) %>%
+    group_by(baby) %>%
+    mutate(noun_perc_cum = cumsum(noun_perc),
+           verb_perc_cum = cumsum(verb_perc),
+           adj_perc_cum = cumsum(adj_perc),
+           adv_perc_cum = cumsum(adv_perc),
+           pron_perc_cum = cumsum(pron_perc)) %>%
+    group_by(baby) %>%
+    mutate(noun_perc_cum = ( noun_perc_cum / seq(100, 2000, by = 100) ) * 100,
+           verb_perc_cum = ( verb_perc_cum / seq(100, 2000, by = 100) ) * 100,
+           adj_perc_cum = ( adj_perc_cum / seq(100, 2000, by = 100)  ) * 100,
+           adv_perc_cum = ( adv_perc_cum / seq(100, 2000, by = 100) ) * 100,
+           pron_perc_cum = ( pron_perc_cum / seq(100, 2000, by = 100) ) * 100)
+  
+}
 
+mot_uni_cat %<>%
+  assign_cat()
+
+table_cat <- function(df) {
+  df %>%
+    filter(section == 20) %>%
+    ungroup() %>%
+    select(baby, noun_perc_cum:pron_perc_cum) %>%
+    rename(`Noun (%)`=noun_perc_cum,
+           `Verb (%)`=verb_perc_cum,
+           `Pron (%)`=pron_perc_cum,
+           `Adj (%)`=adj_perc_cum,
+           `Adv (%)`=adv_perc_cum) %>%
+    (function(x) {
+      x %>%
+        rbind(tibble(baby = "MEAN",
+                     `Noun (%)` = mean(x$`Noun (%)`),
+                     `Verb (%)` = mean(x$`Verb (%)`),
+                     `Pron (%)` = mean(x$`Pron (%)`),
+                     `Adj (%)` = mean(x$`Adj (%)`),
+                     `Adv (%)` = mean(x$`Adv (%)`)))
+    }) %>%
+    round_df(2)
+  
+}
 
 mot_uni_cat_table <- mot_uni_cat %>% 
-  filter(section == 20) %>%
-  ungroup() %>%
-  select(baby, noun_perc_cum:pron_perc_cum) %>%
-  rename(`Noun (%)`=noun_perc_cum,
-         `Verb (%)`=verb_perc_cum,
-         `Pron (%)`=pron_perc_cum,
-         `Adj (%)`=adj_perc_cum,
-         `Adv (%)`=adv_perc_cum) %>%
-  (function(x) {
-    x %>%
-      rbind(tibble(baby = "MEAN",
-                   `Noun (%)` = mean(x$`Noun (%)`),
-                   `Verb (%)` = mean(x$`Verb (%)`),
-                   `Pron (%)` = mean(x$`Pron (%)`),
-                   `Adj (%)` = mean(x$`Adj (%)`),
-                   `Adv (%)` = mean(x$`Adv (%)`)))
-    }) %>%
-  round_df(2)
-
+  table_cat()
+  
 #### CHILDREN ####
+# plurals and verbs to root
+chi_uni_cat <- chi_uni %>%
+  select(baby, section, uni_diff) %>%
+  type_to_root()
+
+# redo unique types
+chi_uni_cat %<>%
+  (function(x) {
+    x$types_root <- setdif_list(x, "types_root")
+    x
+  })
+
+# assign cats
+chi_uni_cat %<>%
+  assign_cat()
+
+chi_uni_cat_table <- chi_uni_cat %>%
+  table_cat()
+
+#### MODEL ####
+
