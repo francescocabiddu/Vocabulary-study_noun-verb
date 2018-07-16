@@ -8,8 +8,6 @@ rm(lib)
 # load homemade funs
 source("homemade_funs.R")
 
-load("~/Dropbox/tirocinio notts/mot_chi study/mot chi_study noun_verb/ws.RData")
-
 #### MOTHERS ####
 # create mot_uni_cat
 mot_uni_cat <- mot_na %>%
@@ -181,6 +179,12 @@ assign_cat <- function(df) {
     }),
     adj_perc = sapply(adj_perc, function(x) {
       ifelse(length(x) == 0, 0, x)
+    }),
+    verb_perc = sapply(verb_perc, function(x) {
+      ifelse(length(x) == 0, 0, x)
+    }),
+    noun_perc = sapply(noun_perc, function(x) {
+      ifelse(length(x) == 0, 0, x)
     })) %>%
     group_by(baby) %>%
     mutate(noun_perc_cum = cumsum(noun_perc),
@@ -247,4 +251,62 @@ chi_uni_cat_table <- chi_uni_cat %>%
   table_cat()
 
 #### MODEL ####
+# assign phon to mot_na_baby_section
+mot_na_baby_section %<>%
+  mutate(phon = mot_phon$phon[fmatch(word, mot_phon$word)])
 
+# mod phons to orts
+mod_uni_cat <- mod %>%
+  select(baby:phon)
+
+phon_to_ort <- function(df) {
+  df$uni_diff <- df$phon
+  
+  for (i in seq_along(df$section)) {
+    for (j in seq_along(df$phon[[i]])) {
+      ort <- df$phon[[i]][j] %>%
+        (function(x) {
+          mot_na_baby_section %>%
+            filter(phon == x) %>%
+            (function(y) {
+              y$word %>%
+                table() %>%
+                sort(decreasing = T) %>%
+                (function(z) {
+                  names(z[1])
+                })
+            })
+        })
+      
+      if (length(ort) == 0) {
+        df$uni_diff[[i]][j] <- NA
+      } else {
+        df$uni_diff[[i]][j] <- ort
+      }
+    }
+  }
+  
+  df
+}
+
+mod_uni_cat %<>%
+  phon_to_ort()
+
+# re run mot/chi script
+mod_uni_cat %<>%
+  select(baby, section, uni_diff) %>%
+  type_to_root()
+
+# redo unique types
+mod_uni_cat %<>%
+  (function(x) {
+    x$types_root <- setdif_list(x, "types_root")
+    x
+  })
+
+# assign cats
+mod_uni_cat %<>%
+  assign_cat()
+
+mod_uni_cat_table <- mod_uni_cat %>%
+  table_cat()
