@@ -310,3 +310,31 @@ mod_uni_cat %<>%
 
 mod_uni_cat_table <- mod_uni_cat %>%
   table_cat()
+
+# save mot words not in chi and vice versa
+types_root <- function(df) {
+  df %>%
+    (function(x) {
+      new_df <- tibble(types_root = unlist(x$types_root) %>% str_replace("\\\\", ""), 
+                       cat = unlist(x$cat)) %>%
+        filter(cat == "N")
+      new_df[!duplicated(new_df$types_root),] %>%
+        arrange(types_root) %>%
+        select(-cat) %>%
+        unlist()
+    })
+}
+
+intersect_types_root <- tibble(mot_nouns_root = types_root(mot_uni_cat),
+       chi_nouns_root = types_root(mot_uni_cat) %in% types_root(chi_uni_cat)) %>%
+  mutate(chi_nouns_root = ifelse(chi_nouns_root == TRUE, mot_nouns_root, NA))
+
+write_csv(intersect_types_root, "mot_chi_nouns.csv", na = "")
+
+write_lines((intersect_types_root %>%
+              filter(is.na(chi_nouns_root)))$mot_nouns_root, 
+            "mot_not_chi.txt")
+
+write_lines((intersect_types_root %>%
+               filter(!is.na(chi_nouns_root)))$mot_nouns_root, 
+            "chi_not_mot.txt")
