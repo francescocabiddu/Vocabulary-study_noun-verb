@@ -311,7 +311,7 @@ mod_uni_cat %<>%
 mod_uni_cat_table <- mod_uni_cat %>%
   table_cat()
 
-# save mot words not in chi and vice versa
+#### save mot nouns not in chi and vice versa ####
 types_root <- function(df) {
   df %>%
     (function(x) {
@@ -333,8 +333,121 @@ write_csv(intersect_types_root, "mot_chi_nouns.csv", na = "")
 
 write_lines((intersect_types_root %>%
               filter(is.na(chi_nouns_root)))$mot_nouns_root, 
-            "mot_not_chi.txt")
+            "mot_NOT_learned.txt")
 
 write_lines((intersect_types_root %>%
                filter(!is.na(chi_nouns_root)))$mot_nouns_root, 
-            "chi_not_mot.txt")
+            "mot_learned.txt")
+
+#### Mot bisyllabic nouns learned ####
+# extract (1) MOT bisyllabic noun types (bis) and (2) MOT monosyllabic (mono) types
+# convert (1) and (2) to phonetic
+mot_nouns_bis <- mot_uni_cat %>%
+  select(baby, types_root, cat) %>%
+  group_by(baby) %>%
+  summarise(types_root = list(unlist(types_root)),
+            cat = list(unlist(cat))) %>%
+  apply(1, function(x) {
+    tibble(id = x$baby, word = unlist(x$types_root), cat = unlist(x$cat))
+  }) %>% 
+  rbindlist() %>%
+  inner_join(., mot_phon, "word") %>%
+  mutate(syllable = str_split(phon, "_") %>% 
+           sapply(function(x) {
+             x %in% vowels %>% 
+               sum()
+           })) %>%
+  filter(cat == "N") %>%
+  filter(syllable == 2)
+
+mot_mono <- mot_uni %>%
+  select(baby, uni_diff) %>%
+  group_by(baby) %>%
+  summarise(uni_diff = list(unlist(uni_diff))) %>%
+  apply(1, function(x) {
+    tibble(id = x$baby, word = unlist(x$uni_diff))
+  }) %>% 
+  rbindlist() %>%
+  inner_join(., mot_phon, "word") %>%
+  mutate(syllable = str_split(phon, "_") %>% 
+           sapply(function(x) {
+             x %in% vowels %>% 
+               sum()
+           })) %>%
+  filter(syllable == 1) %>%
+  arrange(id, phon)
+
+# get rid of deplicates in phon
+mot_mono %<>% 
+  group_by(id, phon) %>%
+  slice(1) %>%
+  ungroup()
+
+# split (1) into learned (1a) and not-learned (1b)
+mot_nouns_bis_learned <- mot_nouns_bis %>%
+  (function(x) {
+    lapply(unique(x$id), function(y) {
+      reference <- (tibble(word = (chi_uni_cat %>% filter(baby == y))$types_root %>% unlist(), 
+                          cat = (chi_uni_cat %>% filter(baby == y))$cat %>% unlist()) %>%
+        filter(cat == "N"))$word
+      
+      mot_nouns_bis %>%
+        filter(id == y) %>%
+        filter(word %in% reference)
+    }) %>% rbindlist()
+  })
+
+mot_nouns_bis_not_learned <- mot_nouns_bis %>%
+  (function(x) {
+    lapply(unique(x$id), function(y) {
+      reference <- (tibble(word = (chi_uni_cat %>% filter(baby == y))$types_root %>% unlist(), 
+                           cat = (chi_uni_cat %>% filter(baby == y))$cat %>% unlist()) %>%
+                      filter(cat == "N"))$word
+      
+      mot_nouns_bis %>%
+        filter(id == y) %>%
+        filter(!word %in% reference)
+    }) %>% rbindlist()
+  })
+
+# assign to each bis how many mono contains (grouped by id)
+mot_nouns_bis_learned %<>%
+  mutate(monosyll = sapply(unique(id), function(name) {
+  sapply((mot_nouns_bis_learned %>% filter(id == name))$phon, function(x) {
+    x %>%
+      str_detect((mot_mono %>% filter(id == name))$phon) %>%
+      sum()
+    })
+    }) %>%
+    unlist())
+
+mot_nouns_bis_not_learned %<>%
+  mutate(monosyll = sapply(unique(id), function(name) {
+    sapply((mot_nouns_bis_not_learned %>% filter(id == name))$phon, function(x) {
+      x %>%
+        str_detect((mot_mono %>% filter(id == name))$phon) %>%
+        sum()
+    })
+  }) %>%
+    unlist())
+
+# sum number of mono in (1a) and (1b) and take average by id
+summary_bysillables <- mot_nouns_bis_learned %>%
+  mutate(monosyll = monosyll %>% (function(x) {
+    names(x) <- NULL
+    x
+  })) %>%
+  group_by(id) %>%
+  summarize(tot_mono_learned = mean(monosyll)) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+  cbind(tot_mono_not_learned = mot_nouns_bis_not_learned %>%
+          mutate(monosyll = monosyll %>% (function(x) {
+            names(x) <- NULL
+            x
+          })) %>%
+          group_by(id) %>%
+          summarize(tot_mono_not_learned = mean(monosyll)) %>%
+          bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+          bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+          select(tot_mono_not_learned))
