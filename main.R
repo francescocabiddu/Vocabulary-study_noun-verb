@@ -1,7 +1,7 @@
 # load libraries
 lib <- c("magrittr", "tidyverse", 
          "data.table", "fastmatch",
-         "beepr", "mailR")
+         "beepr", "mailR", "kableExtra")
 lapply(lib, require, character.only = TRUE)
 rm(lib)
 
@@ -339,7 +339,7 @@ write_lines((intersect_types_root %>%
                filter(!is.na(chi_nouns_root)))$mot_nouns_root, 
             "mot_learned.txt")
 
-#### Mot bisyllabic nouns learned ####
+#### Mot bisyllabic nouns analysis ####
 # extract (1) MOT bisyllabic noun types (bis) and (2) MOT monosyllabic (mono) types
 # convert (1) and (2) to phonetic
 mot_nouns_bis <- mot_uni_cat %>%
@@ -388,8 +388,7 @@ mot_nouns_bis_learned <- mot_nouns_bis %>%
   (function(x) {
     lapply(unique(x$id), function(y) {
       reference <- (tibble(word = (chi_uni_cat %>% filter(baby == y))$types_root %>% unlist(), 
-                          cat = (chi_uni_cat %>% filter(baby == y))$cat %>% unlist()) %>%
-        filter(cat == "N"))$word
+                          cat = (chi_uni_cat %>% filter(baby == y))$cat %>% unlist()))$word
       
       mot_nouns_bis %>%
         filter(id == y) %>%
@@ -401,8 +400,7 @@ mot_nouns_bis_not_learned <- mot_nouns_bis %>%
   (function(x) {
     lapply(unique(x$id), function(y) {
       reference <- (tibble(word = (chi_uni_cat %>% filter(baby == y))$types_root %>% unlist(), 
-                           cat = (chi_uni_cat %>% filter(baby == y))$cat %>% unlist()) %>%
-                      filter(cat == "N"))$word
+                           cat = (chi_uni_cat %>% filter(baby == y))$cat %>% unlist()))$word
       
       mot_nouns_bis %>%
         filter(id == y) %>%
@@ -412,7 +410,7 @@ mot_nouns_bis_not_learned <- mot_nouns_bis %>%
 
 # assign to each bis how many mono contains (grouped by id)
 mot_nouns_bis_learned %<>%
-  mutate(monosyll = sapply(unique(id), function(name) {
+  mutate(monosyll_type = sapply(unique(id), function(name) {
   sapply((mot_nouns_bis_learned %>% filter(id == name))$phon, function(x) {
     x %>%
       str_detect((mot_mono %>% filter(id == name))$phon) %>%
@@ -422,7 +420,7 @@ mot_nouns_bis_learned %<>%
     unlist())
 
 mot_nouns_bis_not_learned %<>%
-  mutate(monosyll = sapply(unique(id), function(name) {
+  mutate(monosyll_type = sapply(unique(id), function(name) {
     sapply((mot_nouns_bis_not_learned %>% filter(id == name))$phon, function(x) {
       x %>%
         str_detect((mot_mono %>% filter(id == name))$phon) %>%
@@ -432,22 +430,387 @@ mot_nouns_bis_not_learned %<>%
     unlist())
 
 # sum number of mono in (1a) and (1b) and take average by id
-summary_bysillables <- mot_nouns_bis_learned %>%
-  mutate(monosyll = monosyll %>% (function(x) {
-    names(x) <- NULL
+summary_bysillables <- function(df1, df2, type = TRUE) {
+ if (type == TRUE) {
+   df1 %>%
+     mutate(monosyll = monosyll_type %>% (function(x) {
+       names(x) <- NULL
+       x
+     })) %>%
+     group_by(id) %>%
+     summarize(tot_mono_learned = mean(monosyll)) %>%
+     bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+     bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+     cbind(tot_mono_not_learned = df2 %>%
+             mutate(monosyll = monosyll_type %>% (function(x) {
+               names(x) <- NULL
+               x
+             })) %>%
+             group_by(id) %>%
+             summarize(tot_mono_not_learned = mean(monosyll)) %>%
+             bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+             bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+             select(tot_mono_not_learned))
+ } else {
+   df1 %>%
+     mutate(monosyll = monosyll_tokens %>% (function(x) {
+       names(x) <- NULL
+       x
+     })) %>%
+     group_by(id) %>%
+     summarize(tot_mono_learned = mean(monosyll)) %>%
+     bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+     bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+     cbind(tot_mono_not_learned = df2 %>%
+             mutate(monosyll = monosyll_tokens %>% (function(x) {
+               names(x) <- NULL
+               x
+             })) %>%
+             group_by(id) %>%
+             summarize(tot_mono_not_learned = mean(monosyll)) %>%
+             bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+             bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+             select(tot_mono_not_learned))
+ }
+  
+  
+}
+
+summary_bis <- list(id = summary_bysillables(mot_nouns_bis_learned,
+                                             mot_nouns_bis_not_learned, 
+                                             type = TRUE))
+
+#### mono types in bis by stage ####
+# bisyllabic words list by stage
+mot_nouns_bis <- mot_uni_cat %>%
+  select(baby, section, types_root, cat) %>%
+  apply(1, function(x) {
+    tibble(id = x$baby, section = x$section, 
+           word = unlist(x$types_root), cat = unlist(x$cat))
+  }) %>% 
+  rbindlist() %>%
+  inner_join(., mot_phon, "word") %>%
+  mutate(syllable = str_split(phon, "_") %>% 
+           sapply(function(x) {
+             x %in% vowels %>% 
+               sum()
+           })) %>%
+  filter(cat == "N") %>%
+  filter(syllable == 2)
+
+# monosyllabic words list by stage 
+mot_mono <- mot_uni %>%
+  select(baby, section, uni_diff) %>%
+  apply(1, function(x) {
+    tibble(id = x$baby, section = x$section, word = unlist(x$uni_diff))
+  }) %>% 
+  rbindlist() %>%
+  inner_join(., mot_phon, "word") %>%
+  mutate(syllable = str_split(phon, "_") %>% 
+           sapply(function(x) {
+             x %in% vowels %>% 
+               sum()
+           })) %>%
+  filter(syllable == 1) %>%
+  arrange(id, phon)
+
+# split into learned not-learned
+mot_nouns_bis %<>%
+  mutate(learned = unique(id) %>%
+           sapply(function(x) {
+             mot_nouns_bis %>%
+               filter(id == x) %>%
+               .$word %>%
+               unlist() %>%
+               {. %in% (chi_uni_cat %>%
+                          filter(baby == x) %>%
+                          .$types_root %>%
+                          unlist())}
+           }) %>%
+           unlist())
+
+mot_nouns_bis_learned <- mot_nouns_bis %>%
+  filter(learned == TRUE)
+
+chi_learned <- chi_uni_cat %>% 
+  apply(1, function(x) {
+    tibble(id = x$baby, section = x$section, 
+           word = unlist(x$types_root))
+  }) %>%
+  rbindlist() 
+
+for (ids in unique(mot_nouns_bis_learned$id)) {
+  for (w in filter(mot_nouns_bis_learned, id == ids)$word) {
+    mot_nouns_bis_learned$section[which(mot_nouns_bis_learned$id == ids & mot_nouns_bis_learned$word == w)] <-
+      chi_learned %>%
+      filter(id == ids, word == w) %>%
+      .$section
+  }
+}
+
+mot_nouns_bis_not_learned <- mot_nouns_bis %>%
+  filter(learned == FALSE)
+
+# assign mono in bis by stage
+assign_mono_type <- function(df) {
+  df %>%
+    mutate(monosyll_type = apply(df %>% 
+                              distinct(id, section), 1, function(y) {
+                                (df %>% filter(id == y[1], section == as.numeric(y[2])))$phon %>%
+                                  sapply(function(x) {
+                                    x %>%
+                                      str_detect((mot_mono %>% filter(id == y[1], section %in% 0:as.numeric(y[2])))$phon %>% 
+                                                   unique()) %>%
+                                      sum()
+                                  })
+                              }) %>%
+             unlist())
+}
+
+mot_nouns_bis_learned %<>% assign_mono_type()
+mot_nouns_bis_not_learned %<>% assign_mono_type()
+
+# mean for each child and total mean
+summary_bis %<>% 
+  c(list(id_stage = summary_bysillables(mot_nouns_bis_learned, mot_nouns_bis_not_learned, 
+                                        type = TRUE)))
+
+#### mono tokens in bis by stage ####
+# create mono tokens by section
+mot_mono_tokens <- mot_na_baby_section %>%
+  select(baby:word) %>%
+  inner_join(., mot_phon, "word") %>%
+  (function(df) {
+    reference <- df[!duplicated(df$phon),] %>%
+      mutate(syllable = str_split(phon, "_") %>% 
+               sapply(function(x) {
+                 x %in% vowels %>% 
+                   sum()
+               }),
+             phonemes = str_split(phon, "_") %>% 
+               sapply(function(x) {
+                 x %>% 
+                   length()
+               })) %>%
+      select(phon:phonemes)
+    
+    df %>%
+      inner_join(., reference, "phon")
+  }) %>%
+  filter(syllable == 1)
+
+# assign mono
+for (i in 1:nrow(mot_nouns_bis_learned)) {
+  mot_nouns_bis_learned$monosyll_tokens[i] <- 
+    mot_mono_tokens %>%
+    filter(baby == mot_nouns_bis_learned$id[i]) %>%
+    filter(section %in% 0:mot_nouns_bis_learned$section[i]) %>%
+    (function(x) {
+      str_detect(mot_nouns_bis_learned$phon[i], x$phon) %>%
+        sum()
+    })
+}
+
+for (i in 1:nrow(mot_nouns_bis_not_learned)) {
+  mot_nouns_bis_not_learned$monosyll_tokens[i] <- 
+    mot_mono_tokens %>%
+    filter(baby == mot_nouns_bis_not_learned$id[i]) %>%
+    filter(section %in% 0:mot_nouns_bis_not_learned$section[i]) %>%
+    (function(x) {
+      str_detect(mot_nouns_bis_not_learned$phon[i], x$phon) %>%
+        sum()
+    })
+}
+
+# add count to summary
+summary_bis %<>% 
+  c(list(id_stage_tokens = summary_bysillables(mot_nouns_bis_learned, mot_nouns_bis_not_learned, 
+                                        type = FALSE)))
+
+#### phoneme seqs in each bisyllabic ####
+# mot_tokens
+mot_tokens <- mot_na_baby_section %>%
+  select(baby:word) %>%
+  inner_join(., mot_phon, "word") %>%
+  (function(df) {
+    reference <- df[!duplicated(df$phon),] %>%
+      mutate(syllable = str_split(phon, "_") %>% 
+               sapply(function(x) {
+                 x %in% vowels %>% 
+                   sum()
+               }),
+             phonemes = str_split(phon, "_") %>% 
+               sapply(function(x) {
+                 x %>% 
+                   length()
+               })) %>%
+      select(phon:phonemes)
+    
+    df %>%
+      inner_join(., reference, "phon")
+  })
+
+# for each bis, calculate all possible adjacent combs and match in mot_tokens
+adj_comb <- function(Data) {
+  A <- lapply(2:(length(Data)-1), sequence)
+  B <- lapply(rev(vapply(A, length, 1L))-1, function(x) c(0, sequence(x)))
+  unlist(lapply(seq_along(A), function(x) {
+    lapply(B[[x]], function(y) Data[A[[x]]+y])
+  }), recursive = FALSE, use.names = FALSE)
+}
+
+adj_comb_complete <- function(Data) {
+  A <- lapply(2:(length(Data)-1), sequence)
+  B <- lapply(rev(vapply(A, length, 1L))-1, function(x) c(0, sequence(x)))
+  c(unlist(lapply(seq_along(A), function(x) {
+    lapply(B[[x]], function(y) Data[A[[x]]+y])
+  }), recursive = FALSE, use.names = FALSE), list(Data))
+}
+
+seq2_5 <- function(df) {
+  df %>%
+  mutate(split = str_split(phon, "_") %>%
+           sapply(adj_comb)) %>%
+    mutate(seq2 = split %>% 
+             sapply(function(x) {
+               x[lapply(x, length) == 2]
+             }) %>%
+             sapply(function(y) {
+               sapply(y, function(j) {
+                 paste(j, collapse = "_")
+               })
+             }),
+           seq3 = split %>% 
+             sapply(function(x) {
+               x[lapply(x, length) == 3]
+             }) %>%
+             sapply(function(y) {
+               sapply(y, function(j) {
+                 paste(j, collapse = "_")
+               })
+             }),
+           seq4 = split %>% 
+             sapply(function(x) {
+               x[lapply(x, length) == 4]
+             }) %>%
+             sapply(function(y) {
+               sapply(y, function(j) {
+                 paste(j, collapse = "_")
+               })
+             }),
+           seq5 = split %>% 
+             sapply(function(x) {
+               x[lapply(x, length) == 5]
+             }) %>%
+             sapply(function(y) {
+               sapply(y, function(j) {
+                 paste(j, collapse = "_")
+               })
+             })
+    )
+}
+
+mot_nouns_bis_learned %<>%
+  seq2_5()
+
+mot_nouns_bis_not_learned %<>%
+  seq2_5()
+
+mot_tokens %<>%
+  filter(str_detect(phon, "_")) %>%
+  (function(y) {
+    reference <- y[!duplicated(y$phon),] %>%
+      mutate(split = str_split(phon, "_") %>%
+               sapply(function(x) {
+                 adj_comb_complete(x)
+               })) %>%
+      mutate(seq2 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 2]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               }),
+             seq3 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 3]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               }),
+             seq4 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 4]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               }),
+             seq5 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 5]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               })
+      ) 
+    
+    y %>%
+      inner_join(., reference, "phon")
+  }) %>%
+  select(baby.x:phonemes.x, split.y:seq5) %>%
+  (function(x) {
+    colnames(x) <- str_remove(colnames(x), "[.]{1}.*$")
     x
-  })) %>%
-  group_by(id) %>%
-  summarize(tot_mono_learned = mean(monosyll)) %>%
-  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
-  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
-  cbind(tot_mono_not_learned = mot_nouns_bis_not_learned %>%
-          mutate(monosyll = monosyll %>% (function(x) {
-            names(x) <- NULL
-            x
-          })) %>%
-          group_by(id) %>%
-          summarize(tot_mono_not_learned = mean(monosyll)) %>%
-          bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
-          bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
-          select(tot_mono_not_learned))
+  })
+
+# check how many times sequences appear in mot_tokens
+assign_seq <- function(df, seq_num, df_ref) {
+  apply(df, 1, function(rows) {
+    (mot_tokens %>%
+       filter(baby == rows[1], section %in% 0:as.numeric(rows[2])) %>%
+       .[[seq_num]] %>%
+       unlist()) %in% (df_ref %>%
+                         filter(id == rows[1], section == as.numeric(rows[2])) %>%
+                         .[[seq_num]] %>%
+                         unlist()) %>% 
+      sum() %>%
+      {. / (df_ref %>%
+              filter(id == rows[1], section == as.numeric(rows[2])) %>%
+              nrow())}})
+}
+
+summary_seq_tokens <- function(df) {
+  df %>%
+    arrange(id, section) %>%
+    group_by(id) %>%
+    summarise(mean_seq2 = mean(seq2),
+              mean_seq3 = mean(seq3),
+              mean_seq4 = mean(seq4),
+              mean_seq5 = mean(seq5)) %>%
+    bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+    bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
+}
+
+summary_seq_tokens_learned <- mot_nouns_bis_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_bis_learned),
+         seq3 = assign_seq(., "seq3", mot_nouns_bis_learned),
+         seq4 = assign_seq(., "seq4", mot_nouns_bis_learned),
+         seq5 = assign_seq(., "seq5", mot_nouns_bis_learned)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_not_learned <- mot_nouns_bis_not_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_bis_not_learned),
+         seq3 = assign_seq(., "seq3", mot_nouns_bis_not_learned),
+         seq4 = assign_seq(., "seq4", mot_nouns_bis_not_learned),
+         seq5 = assign_seq(., "seq5", mot_nouns_bis_not_learned)) %>%
+  summary_seq_tokens()
