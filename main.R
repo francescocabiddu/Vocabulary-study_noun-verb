@@ -814,3 +814,150 @@ summary_seq_tokens_not_learned <- mot_nouns_bis_not_learned %>%
          seq4 = assign_seq(., "seq4", mot_nouns_bis_not_learned),
          seq5 = assign_seq(., "seq5", mot_nouns_bis_not_learned)) %>%
   summary_seq_tokens()
+
+# same calculations but for monosyllabic and trisyllabic words!
+# bisyllabic words list by stage
+mot_nouns <- mot_uni_cat %>%
+  select(baby, section, types_root, cat) %>%
+  apply(1, function(x) {
+    tibble(id = x$baby, section = x$section, 
+           word = unlist(x$types_root), cat = unlist(x$cat))
+  }) %>% 
+  rbindlist() %>%
+  inner_join(., mot_phon, "word") %>%
+  mutate(syllable = str_split(phon, "_") %>% 
+           sapply(function(x) {
+             x %in% vowels %>% 
+               sum()
+           })) %>%
+  filter(cat == "N")
+
+mot_nouns_mono <- mot_nouns %>%
+  filter(syllable == 1)
+
+mot_nouns_tri <- mot_nouns %>%
+  filter(syllable == 3)
+
+# MONO 
+# split into learned not-learned
+mot_nouns_mono %<>%
+  mutate(learned = unique(id) %>%
+           sapply(function(x) {
+             mot_nouns_mono %>%
+               filter(id == x) %>%
+               .$word %>%
+               unlist() %>%
+               {. %in% (chi_uni_cat %>%
+                          filter(baby == x) %>%
+                          .$types_root %>%
+                          unlist())}
+           }) %>%
+           unlist())
+
+mot_nouns_mono_learned <- mot_nouns_mono %>%
+  filter(learned == TRUE)
+
+chi_learned <- chi_uni_cat %>% 
+  apply(1, function(x) {
+    tibble(id = x$baby, section = x$section, 
+           word = unlist(x$types_root))
+  }) %>%
+  rbindlist() 
+
+for (ids in unique(mot_nouns_mono_learned$id)) {
+  for (w in filter(mot_nouns_mono_learned, id == ids)$word) {
+    mot_nouns_mono_learned$section[which(mot_nouns_mono_learned$id == ids & mot_nouns_mono_learned$word == w)] <-
+      chi_learned %>%
+      filter(id == ids, word == w) %>%
+      .$section
+  }
+}
+
+mot_nouns_mono_not_learned <- mot_nouns_mono %>%
+  filter(learned == FALSE)
+
+mot_nouns_mono_learned %<>%
+  filter(str_detect(phon, "_")) %>%
+  seq2_5()
+
+mot_nouns_mono_not_learned %<>%
+  filter(str_detect(phon, "_")) %>%
+  seq2_5()
+
+summary_seq_tokens_mono_learned <- mot_nouns_mono_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_mono_learned),
+         seq3 = assign_seq(., "seq3", mot_nouns_mono_learned),
+         seq4 = assign_seq(., "seq4", mot_nouns_mono_learned),
+         seq5 = assign_seq(., "seq5", mot_nouns_mono_learned)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_mono_not_learned <- mot_nouns_mono_not_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_mono_not_learned),
+         seq3 = assign_seq(., "seq3", mot_nouns_mono_not_learned),
+         seq4 = assign_seq(., "seq4", mot_nouns_mono_not_learned),
+         seq5 = assign_seq(., "seq5", mot_nouns_mono_not_learned)) %>%
+  summary_seq_tokens()
+
+# TRI
+# split into learned not-learned
+mot_nouns_tri %<>%
+  mutate(learned = unique(id) %>%
+           sapply(function(x) {
+             mot_nouns_tri %>%
+               filter(id == x) %>%
+               .$word %>%
+               unlist() %>%
+               {. %in% (chi_uni_cat %>%
+                          filter(baby == x) %>%
+                          .$types_root %>%
+                          unlist())}
+           }) %>%
+           unlist())
+
+mot_nouns_tri_learned <- mot_nouns_tri %>%
+  filter(learned == TRUE)
+
+chi_learned <- chi_uni_cat %>% 
+  apply(1, function(x) {
+    tibble(id = x$baby, section = x$section, 
+           word = unlist(x$types_root))
+  }) %>%
+  rbindlist() 
+
+for (ids in unique(mot_nouns_tri_learned$id)) {
+  for (w in filter(mot_nouns_tri_learned, id == ids)$word) {
+    mot_nouns_tri_learned$section[which(mot_nouns_tri_learned$id == ids & mot_nouns_tri_learned$word == w)] <-
+      chi_learned %>%
+      filter(id == ids, word == w) %>%
+      .$section
+  }
+}
+
+mot_nouns_tri_not_learned <- mot_nouns_tri %>%
+  filter(learned == FALSE)
+
+mot_nouns_tri_learned %<>%
+  filter(str_detect(phon, "_")) %>%
+  seq2_5()
+
+mot_nouns_tri_not_learned %<>%
+  filter(str_detect(phon, "_")) %>%
+  seq2_5()
+
+summary_seq_tokens_tri_learned <- mot_nouns_tri_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_tri_learned),
+         seq3 = assign_seq(., "seq3", mot_nouns_tri_learned),
+         seq4 = assign_seq(., "seq4", mot_nouns_tri_learned),
+         seq5 = assign_seq(., "seq5", mot_nouns_tri_learned)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_tri_not_learned <- mot_nouns_tri_not_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_tri_not_learned),
+         seq3 = assign_seq(., "seq3", mot_nouns_tri_not_learned),
+         seq4 = assign_seq(., "seq4", mot_nouns_tri_not_learned),
+         seq5 = assign_seq(., "seq5", mot_nouns_tri_not_learned)) %>%
+  summary_seq_tokens()
