@@ -961,3 +961,28 @@ summary_seq_tokens_tri_not_learned <- mot_nouns_tri_not_learned %>%
          seq4 = assign_seq(., "seq4", mot_nouns_tri_not_learned),
          seq5 = assign_seq(., "seq5", mot_nouns_tri_not_learned)) %>%
   summary_seq_tokens()
+
+#### frequency of learned/not learned words up to current stage ####
+freq_up_stage <- function(df) {
+  sapply(1:nrow(df), function(i) {
+    mot_na_baby_section %>%
+      filter(word == df$word[i],
+             baby == df$id[i],
+             section %in% 0:df$section[i]) %>%
+      nrow()
+  })
+}
+
+mot_nouns_mono_learned %<>%
+  mutate(freq = freq_up_stage(.))
+mot_nouns_mono_not_learned %<>%
+  mutate(freq = freq_up_stage(.))
+mot_nouns_bis_learned %<>%
+  mutate(freq = freq_up_stage(.))
+mot_nouns_bis_not_learned %<>%
+  mutate(freq = freq_up_stage(.))
+mot_nouns_tri_learned %<>%
+  mutate(freq = freq_up_stage(.))
+mot_nouns_tri_not_learned %<>%
+  mutate(freq = freq_up_stage(.))
+
