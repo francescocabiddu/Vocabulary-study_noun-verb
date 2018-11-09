@@ -1,7 +1,8 @@
 # load libraries
 lib <- c("magrittr", "tidyverse", 
          "data.table", "fastmatch",
-         "beepr", "mailR", "kableExtra")
+         "beepr", "mailR", "kableExtra",
+         "lme4")
 lapply(lib, require, character.only = TRUE)
 rm(lib)
 
@@ -771,20 +772,23 @@ mot_tokens %<>%
     x
   })
 
+# unique sequences in seq2 of mot_tokens
+mot_tokens %<>%
+  mutate(seq2 = sapply(seq2, unique))
+
 # check how many times sequences appear in mot_tokens
 assign_seq <- function(df, seq_num, df_ref) {
   apply(df, 1, function(rows) {
-    (mot_tokens %>%
-       filter(baby == rows[1], section %in% 0:as.numeric(rows[2])) %>%
-       .[[seq_num]] %>%
-       unlist()) %in% (df_ref %>%
-                         filter(id == rows[1], section == as.numeric(rows[2])) %>%
-                         .[[seq_num]] %>%
-                         unlist()) %>% 
-      sum() %>%
-      {. / (df_ref %>%
+    sapply((df_ref %>%
               filter(id == rows[1], section == as.numeric(rows[2])) %>%
-              nrow())}})
+              .[[seq_num]]),  function(x) {
+                (mot_tokens %>%
+                   filter(baby == rows[1], section %in% 0:as.numeric(rows[2])) %>%
+                   .[[seq_num]] %>%
+                   unlist()) %>%
+                  str_count(paste("^", x, "$", collapse = "|", sep="")) %>% sum() 
+              }) %>% mean()
+    })
 }
 
 summary_seq_tokens <- function(df) {
@@ -986,3 +990,82 @@ mot_nouns_tri_learned %<>%
 mot_nouns_tri_not_learned %<>%
   mutate(freq = freq_up_stage(.))
 
+#### (1) learned not learned matched on frequency ####
+summary_freq <- function(df, name_var) {
+  df %>%
+    group_by(id) %>%
+    summarize(!!name_var := mean(freq))
+}
+
+summary_freq_sets <- summary_freq(mot_nouns_mono_learned, "Mono_learned_freq") %>%
+  cbind(summary_freq(mot_nouns_mono_not_learned, "Mono_not_learned_freq")[,2]) %>%
+  cbind(summary_freq(mot_nouns_bis_learned, "Bis_learned_freq")[,2]) %>%
+  cbind(summary_freq(mot_nouns_bis_not_learned, "Bis_not_learned_freq")[,2]) %>%
+  cbind(summary_freq(mot_nouns_tri_learned, "Tri_learned_freq")[,2]) %>%
+  cbind(summary_freq(mot_nouns_tri_not_learned, "Tri_not_learned_freq")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
+
+equalize_mean <- function(df, id_name, var_name) {
+  df %>% 
+    filter(id == id_name) %>%
+    arrange(desc(freq)) %>%
+    (function(x) {
+      mean_equal = FALSE
+      row = 1
+      while (mean_equal == FALSE) {
+        x_temp <- x[-c(1:row),]
+        
+        if (mean(x_temp$freq) < (summary_freq_sets[[var_name]][which(summary_freq_sets$id == id_name)] + 0)) {
+          mean_equal = TRUE
+        } else {
+          row = row + 1
+        }
+      }
+      if (row - 1 == 0) {
+        x
+      } else {
+        x[-c(1:(row-sample(c(-2,3), 1))),]
+      }
+    })
+}
+
+temp <- tibble(dfs = c("mot_nouns_mono_learned",
+               "mot_nouns_bis_learned",
+               "mot_nouns_tri_learned"),
+       vars = colnames(summary_freq_sets)[-1] %>% .[grepl("not",.)])
+
+matched_dfs <- list()
+for (rows in 1:nrow(temp)) {
+  matched_dfs[[paste(temp$dfs[rows], "match", sep = "_")]] <-
+    unique(get(temp$dfs[rows])$id) %>%
+    lapply(function(x) {
+      equalize_mean(get(temp$dfs[rows]), x, temp$vars[rows])
+    }) %>%
+    rbindlist()
+} ; rm(rows, temp)
+  
+# repeat calculation for new dfs
+summary_seq_tokens_mono_learned_match <- matched_dfs[["mot_nouns_mono_learned_match"]] %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", matched_dfs[["mot_nouns_mono_learned_match"]]),
+         seq3 = assign_seq(., "seq3", matched_dfs[["mot_nouns_mono_learned_match"]]),
+         seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_mono_learned_match"]]),
+         seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_mono_learned_match"]])) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_bis_learned_match <- matched_dfs[["mot_nouns_bis_learned_match"]] %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", matched_dfs[["mot_nouns_bis_learned_match"]]),
+         seq3 = assign_seq(., "seq3", matched_dfs[["mot_nouns_bis_learned_match"]]),
+         seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_bis_learned_match"]]),
+         seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_bis_learned_match"]])) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_tri_learned_match <- matched_dfs[["mot_nouns_tri_learned_match"]] %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", matched_dfs[["mot_nouns_tri_learned_match"]]),
+         seq3 = assign_seq(., "seq3", matched_dfs[["mot_nouns_tri_learned_match"]]),
+         seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_tri_learned_match"]]),
+         seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_tri_learned_match"]])) %>%
+  summary_seq_tokens()
