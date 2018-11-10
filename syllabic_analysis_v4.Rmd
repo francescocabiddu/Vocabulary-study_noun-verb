@@ -3,7 +3,7 @@ output:
   word_document:
     toc: yes
     reference_docx: template1.docx
-toc-title: 'Paper 1: results (syllabic analysis, v4)'
+toc-title: 'Vocabulary paper: results - syllabic analysis (v4)'
 ---
 
 <!-- loading packages, user-defined functions and datasets -->
@@ -25,7 +25,18 @@ knitr::opts_chunk$set(
 
 <br>
 
-### 1. Monosyllabic types in bisyllabic mothers' words
+# Summary of results
+
+<br>
+
+Phoneme models analysis on mother's vocabulary showed longer sequences in learned bisyllabic and trisyllabic words (and shorter sequences in not learned trisyllabic words, 1.4.). When learned words matched not learned words on frequency, the differences disappeared (1.5.).
+Phoneme models analysis on child's vocabulary showed that the differences are still found when learned words matched not learned words on frequency (2.2.). In 2.2. bisyllabic words showed a significant difference for 4 and 5-phoneme sequences. Trisyllabic words showed a tendency to significance for 4 and 5-phoneme sequences because of the large variation of average number of models across children (due to some small trisyllabic matched learned words sample sizes, see table "Summary number of words" in section 1.5.).
+
+<br>
+
+# 1. Counts on Mothers' utterances
+
+### 1.1. Monosyllabic types in bisyllabic mothers' words
 Average number of "mother's monosyllabic types" contained in "mother's bisyllabic noun types" (bisyllabic nouns learned by the children" and "not learned by the children")
 
 ```{r echo=FALSE}
@@ -34,7 +45,7 @@ summary_bis[["id"]] %>% round_df(2) %>% kable()
 
 <br>
 
-### 2. Monosyllabic types in bisyllabic mothers' words over time
+### 1.2. Monosyllabic types in bisyllabic mothers' words over time
 Same as above, but over time (only including those monosyllabic types that occurred in previous stages, up to current stage)
 
 ```{r echo=FALSE}
@@ -43,7 +54,7 @@ summary_bis[["id_stage"]] %>% round_df(2) %>% kable()
 
 <br>
 
-### 3. Monosyllabic tokens in bisyllabic mothers' words over time
+### 1.3. Monosyllabic tokens in bisyllabic mothers' words over time
 Same as above, but considering monosyllabic tokens instead of types, in order to account for the frequency of the models (e.g. in the case of "table" [t + ey + bull], the frequency of "bull" in the maternal corpus could influence the probability of using the monosyllabic "bull" to build "table")
 
 ```{r echo=FALSE}
@@ -52,7 +63,7 @@ summary_bis[["id_stage_tokens"]] %>% round_df(2) %>% kable()
 
 <br>
 
-### 4. phoneme models over time
+### 1.4. phoneme models over time
 Average number of 2-phoneme, 3-phoneme, 4-phoneme and 5-phoneme 'models' (tokens considered) there are in the input up until current stage.
 
 <br>
@@ -122,6 +133,9 @@ tibble(Avg_difference = c("Monosyllabic", "Bisyllabic", "Trisyllabic"),
        `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
   kable()
 ```
+
+
+Learned and not learned words in every set statistically differ in frequency. In the following, we compare monosyllabic, bisyllabic and trisyllabic learned and not learned words. See 1.5 for the same analysis using a subset of learned words that matches not learned words on frequency. 
 
 <br>
 
@@ -301,6 +315,26 @@ summary_seq_tokens_tri_learned %>%
   long_summary(" Learned") %>%
   rbind(summary_seq_tokens_tri_not_learned %>%
           long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("2")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 2-phoneme 'models' in learned and not-learned trisyllabic nouns
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+summary_seq_tokens_tri_learned %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_tri_not_learned %>%
+          long_summary(" Not learned")) %>%
   filter(Sequence %in% c("4", "5")) %>%
   ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
   stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
@@ -316,8 +350,8 @@ summary_seq_tokens_tri_learned %>%
 
 <br>
 
-### 5. phoneme models over time matching on frequency
-Repeating (4) matching learned and not learned words on frequency 
+### 1.5. phoneme models over time matching on frequency
+Repeating (1.4.) matching learned and not learned words on frequency 
 The largest subset of words in each set was created. 
 Starting from the most frequent type, types were excluded from the learned set, until the learned set had an approximately equal mean to the not learned set.
 
@@ -496,7 +530,7 @@ summary_seq_tokens_tri_not_learned %>% round_df(2) %>% kable()
 tests <- list(t.test(summary_seq_tokens_tri_learned_match$mean_seq2[1:12],
                  summary_seq_tokens_tri_not_learned$mean_seq2[1:12],
                  paired = TRUE),
-          t.test(summary_seq_tokens_tri_learned$mean_seq3[1:12],
+          t.test(summary_seq_tokens_tri_learned_match$mean_seq3[1:12],
                  summary_seq_tokens_tri_not_learned$mean_seq3[1:12],
                  paired = TRUE),
           t.test(summary_seq_tokens_tri_learned_match$mean_seq4[1:12],
@@ -515,4 +549,475 @@ tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
 
 <br>
 
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+long_summary <- function(df, set_label) {
+  df %>%
+    .[1:12,] %>%
+    gather(sequence, Mean, mean_seq2:mean_seq5) %>%
+    mutate(Sequence = str_replace(sequence, "^mean_seq", ""),
+           Set = set_label)
+}
+
+summary_seq_tokens_tri_learned_match %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_tri_not_learned %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("2")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 2-phoneme 'models' in learned and not-learned matched trisyllabic nouns
+
+<br>
+
+Apart from a difference in 2-phoneme sequences between learned and not learned trisyllabic nouns, no differences were found matching learned and not learned words on frequency. In 2. the phoneme sequences analysis (1.4 and 1.5) is repeated, counting models occurrencies in the child's vocabulary rather than the mother's.
+
+<br>
+
+# 2. Counts on Children's utterances
+Models in children's vocabulary rather than the mothers'
+
+<br>
+
+### 2.1. phoneme models over time
+Average number of 2-phoneme, 3-phoneme, 4-phoneme and 5-phoneme 'models' (tokens considered) there are in child's vocabulary up until current stage.
+
+<br>
+
+#### Phoneme calculation for Mothers' MONOSYLLABIC nouns.
+
+<br>
+
+##### Mothers' monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Mothers' monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_not_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare Average number of 'models' in learned and not-learned MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+tests <- list(t.test(summary_seq_tokens_mono_learned_chi$mean_seq2[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_mono_learned_chi$mean_seq3[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_mono_learned_chi$mean_seq4[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_mono_learned_chi$mean_seq5[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {x$statistic}) %>% round(2),
+       p_value = sapply(tests, function(x) {x$p.value}) %>% round(3),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+#### BISYLLABIC NOUNS
+
+<br>
+
+##### Mothers' bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Mothers' bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_not_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare Average number of 'models' in learned and not-learned bisyllabic nouns
+
+```{r echo=FALSE}
+tests <- list(t.test(summary_seq_tokens_learned_chi$mean_seq2[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_learned_chi$mean_seq3[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_learned_chi$mean_seq4[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_learned_chi$mean_seq5[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {x$statistic}) %>% round(2),
+       p_value = sapply(tests, function(x) {x$p.value}) %>% round(3),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+long_summary <- function(df, set_label) {
+  df %>%
+    .[1:12,] %>%
+    gather(sequence, Mean, mean_seq2:mean_seq5) %>%
+    mutate(Sequence = str_replace(sequence, "^mean_seq", ""),
+           Set = set_label)
+}
+
+summary_seq_tokens_learned_chi %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_not_learned_chi %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("3")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 3-phoneme 'models' in learned and not-learned bisyllabic nouns
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+summary_seq_tokens_learned_chi %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_not_learned_chi %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("4", "5")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 4-phoneme and 5-phoneme 'models' in learned and not-learned bisyllabic nouns
+
+<br>
+
+#### Phoneme calculation for Mothers' TRISYLLABIC nouns.
+
+<br>
+
+##### Mothers' trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Mothers' trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_not_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare Average number of 'models' in learned and not-learned TRISYLLABIC nouns
+
+```{r echo=FALSE}
+tests <- list(t.test(summary_seq_tokens_tri_learned_chi$mean_seq2[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_tri_learned_chi$mean_seq3[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_tri_learned_chi$mean_seq4[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_tri_learned_chi$mean_seq5[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {x$statistic}) %>% round(2),
+       p_value = sapply(tests, function(x) {x$p.value}) %>% round(3),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+long_summary <- function(df, set_label) {
+  df %>%
+    .[1:12,] %>%
+    gather(sequence, Mean, mean_seq2:mean_seq5) %>%
+    mutate(Sequence = str_replace(sequence, "^mean_seq", ""),
+           Set = set_label)
+}
+
+summary_seq_tokens_tri_learned_chi %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_tri_not_learned_chi %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("4", "5")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 4-phoneme and 5-phoneme 'models' in learned and not-learned trisyllabic nouns
+
+<br>
+
+Counting phoneme models in children's vocabulary showed a similar pattern to mothers's vocabulary (1.4.). In 2.2. learned and not learned words matched on frequency are compared counting models in children's vocabulary. 
+
+<br>
+
+### 2.2. phoneme models over time matching on frequency
+
+<br>
+
+#### Phoneme calculation for Mothers' MONOSYLLABIC matched nouns.
+
+<br>
+
+##### Mothers' matched monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_learned_match_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Mothers' matched monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_not_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare Average number of 'models' in learned and not-learned matched MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+tests <- list(t.test(summary_seq_tokens_mono_learned_match_chi$mean_seq2[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_mono_learned_match_chi$mean_seq3[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_mono_learned_match_chi$mean_seq4[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_mono_learned_match_chi$mean_seq5[1:12],
+                 summary_seq_tokens_mono_not_learned_chi$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {x$statistic}) %>% round(2),
+       p_value = sapply(tests, function(x) {x$p.value}) %>% round(3),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+#### Phoneme calculation for Mothers' BISYLLABIC matched nouns.
+
+<br>
+
+##### Mothers' matched bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_bis_learned_match_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Mothers' matched bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_not_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare Average number of 'models' in learned and not-learned matched BISYLLABIC nouns
+
+```{r echo=FALSE}
+tests <- list(t.test(summary_seq_tokens_bis_learned_match_chi$mean_seq2[1:12] %>% round(2),
+                 summary_seq_tokens_not_learned_chi$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_bis_learned_match_chi$mean_seq3[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_bis_learned_match_chi$mean_seq4[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_bis_learned_match_chi$mean_seq5[1:12],
+                 summary_seq_tokens_not_learned_chi$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {x$statistic}) %>% round(2),
+       p_value = sapply(tests, function(x) {x$p.value}) %>% round(3),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+summary_seq_tokens_bis_learned_match_chi %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_not_learned_chi %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("4", "5")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 4-phoneme and 5-phoneme 'models' in learned and not-learned bisyllabic nouns
+
+<br>
+
+**When comparing matched learned and not learned bisyllabic words, a statistical difference is found for 4 and 5-phoneme models in children's vocabulary.**
+
+<br>
+
+#### Phoneme calculation for Mothers' TRISYLLATRIC matched nouns.
+
+<br>
+
+##### Mothers' matched trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_learned_match_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Mothers' matched trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_not_learned_chi %>% round_df(2) %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare Average number of 'models' in learned and not-learned matched TRISYLLATRIC nouns
+
+```{r echo=FALSE}
+tests <- list(t.test(summary_seq_tokens_tri_learned_match_chi$mean_seq2[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_tri_learned_match_chi$mean_seq3[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_tri_learned_match_chi$mean_seq4[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(summary_seq_tokens_tri_learned_match_chi$mean_seq5[1:12],
+                 summary_seq_tokens_tri_not_learned_chi$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {x$statistic}) %>% round(2),
+       p_value = sapply(tests, function(x) {x$p.value}) %>% round(3),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+long_summary <- function(df, set_label) {
+  df %>%
+    .[1:12,] %>%
+    gather(sequence, Mean, mean_seq2:mean_seq5) %>%
+    mutate(Sequence = str_replace(sequence, "^mean_seq", ""),
+           Set = set_label)
+}
+
+summary_seq_tokens_tri_learned_match_chi %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_tri_not_learned_chi %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("2")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 2-phoneme 'models' in learned and not-learned matched trisyllabic nouns
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+summary_seq_tokens_tri_learned_match_chi %>%
+  long_summary(" Learned") %>%
+  rbind(summary_seq_tokens_tri_not_learned_chi %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence %in% c("4", "5")) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_se, position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab("Mean number of models")
+```
+
+**Figure .** Mean and standard errors of number of 4-phoneme and 5-phoneme 'models' in learned and not-learned matched trisyllabic nouns
+
+<br>
+
+
+**When comparing matched learned and not learned trisyllabic words, tendencies to statistical difference are present for 4 and 5-phoneme models in children's vocabulary, showing more models in children's vocabulary for learned words.**
+**A reason why these comparisons didn't reach statistical significance could be found in the small sample size of learned trisyllabic models (in child's vocabulary) that increased the variation of models average number**
 

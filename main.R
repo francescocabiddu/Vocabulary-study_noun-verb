@@ -777,17 +777,17 @@ mot_tokens %<>%
   mutate(seq2 = sapply(seq2, unique))
 
 # check how many times sequences appear in mot_tokens
-assign_seq <- function(df, seq_num, df_ref) {
+assign_seq <- function(df, seq_num, df_ref, df_count = mot_tokens) {
   apply(df, 1, function(rows) {
     sapply((df_ref %>%
               filter(id == rows[1], section == as.numeric(rows[2])) %>%
               .[[seq_num]]),  function(x) {
-                (mot_tokens %>%
+                (df_count %>%
                    filter(baby == rows[1], section %in% 0:as.numeric(rows[2])) %>%
                    .[[seq_num]] %>%
                    unlist()) %>%
                   str_count(paste("^", x, "$", collapse = "|", sep="")) %>% sum() 
-              }) %>% mean()
+              }) %>% mean(na.rm = TRUE)
     })
 }
 
@@ -795,12 +795,12 @@ summary_seq_tokens <- function(df) {
   df %>%
     arrange(id, section) %>%
     group_by(id) %>%
-    summarise(mean_seq2 = mean(seq2),
-              mean_seq3 = mean(seq3),
-              mean_seq4 = mean(seq4),
-              mean_seq5 = mean(seq5)) %>%
-    bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
-    bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
+    summarise(mean_seq2 = mean(seq2, na.rm = TRUE),
+              mean_seq3 = mean(seq3, na.rm = TRUE),
+              mean_seq4 = mean(seq4, na.rm = TRUE),
+              mean_seq5 = mean(seq5, na.rm = TRUE)) %>%
+    bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(., na.rm = TRUE) else "MEAN"))) %>%
+    bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(., na.rm = TRUE) else "SD")))
 }
 
 summary_seq_tokens_learned <- mot_nouns_bis_learned %>%
@@ -1069,3 +1069,169 @@ summary_seq_tokens_tri_learned_match <- matched_dfs[["mot_nouns_tri_learned_matc
          seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_tri_learned_match"]]),
          seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_tri_learned_match"]])) %>%
   summary_seq_tokens()
+
+#### phoneme models counted in children vocabulary ####
+# children's utterances, adding section and long formatting
+chi_phon <- phon
+colnames(chi_phon) <- c("word", "phon")
+rm(phon)
+
+chi_na_id_sec <- mot_chi_na %>%
+  filter(id == "CHI") %>%
+  arrange(baby, hour, half_hour) %>%
+  mutate(section = c(rep(1:20, 1038)[order(rep(1:20, 1038))], rep(20, 11),
+                     rep(1:20, 884)[order(rep(1:20, 884))], rep(20, 12),
+                     rep(1:20, 1222)[order(rep(1:20, 1222))],
+                     rep(1:20, 1293)[order(rep(1:20, 1293))], rep(20, 13),
+                     rep(1:20, 1100)[order(rep(1:20, 1100))], rep(20, 16),
+                     rep(1:20, 866)[order(rep(1:20, 866))], 20,
+                     rep(1:20, 940)[order(rep(1:20, 940))], rep(20, 15),
+                     rep(1:20, 685)[order(rep(1:20, 685))], rep(20, 11),
+                     rep(1:20, 835)[order(rep(1:20, 835))], rep(20, 2),
+                     rep(1:20, 902)[order(rep(1:20, 902))], 20,
+                     rep(1:20, 1046)[order(rep(1:20, 1046))], rep(20, 8),
+                     rep(1:20, 862)[order(rep(1:20, 862))], rep(20, 13))) %>%
+  select(-id, -half_hour, -hour, -mor) %>%
+  rename(id = baby) %>%
+  select(id, section, string) %>%
+  apply(., 1, function(x) {
+    x %>%
+      (function(x) {
+        tibble(id = x$id, 
+               section = x$section, 
+               word = unlist(x$string))
+      })
+  }) %>%
+  rbindlist() %>%
+  inner_join(., chi_phon, "word") 
+
+# sequences 
+chi_tokens <- chi_na_id_sec %>%
+  filter(str_detect(phon, "_")) %>%
+  (function(y) {
+    reference <- y[!duplicated(y$phon),] %>%
+      mutate(split = str_split(phon, "_") %>%
+               sapply(function(x) {
+                 adj_comb_complete(x)
+               })) %>%
+      mutate(seq2 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 2]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               }),
+             seq3 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 3]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               }),
+             seq4 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 4]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               }),
+             seq5 = split %>% 
+               sapply(function(x) {
+                 x[lapply(x, length) == 5]
+               }) %>%
+               sapply(function(y) {
+                 sapply(y, function(j) {
+                   paste(j, collapse = "_")
+                 })
+               })
+      ) 
+    
+    y %>%
+      inner_join(., reference, "phon")
+  }) %>%
+  select(id.x:phon, split:seq5) %>%
+  (function(x) {
+    colnames(x) <- str_remove(colnames(x), "[.]{1}.*$")
+    x
+  }) %>%
+  mutate(seq2 = sapply(seq2, unique)) %>%
+  rename(baby = id)
+
+summary_seq_tokens_mono_learned_chi <- mot_nouns_mono_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_mono_learned, df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", mot_nouns_mono_learned, df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", mot_nouns_mono_learned, df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", mot_nouns_mono_learned, df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_mono_not_learned_chi <- mot_nouns_mono_not_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_mono_not_learned, df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", mot_nouns_mono_not_learned, df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", mot_nouns_mono_not_learned, df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", mot_nouns_mono_not_learned, df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_learned_chi <- mot_nouns_bis_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_bis_learned, df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", mot_nouns_bis_learned, df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", mot_nouns_bis_learned, df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", mot_nouns_bis_learned, df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_not_learned_chi <- mot_nouns_bis_not_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_bis_not_learned, df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", mot_nouns_bis_not_learned, df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", mot_nouns_bis_not_learned, df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", mot_nouns_bis_not_learned, df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_tri_learned_chi <- mot_nouns_tri_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_tri_learned, df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", mot_nouns_tri_learned, df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", mot_nouns_tri_learned, df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", mot_nouns_tri_learned, df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_tri_not_learned_chi <- mot_nouns_tri_not_learned %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", mot_nouns_tri_not_learned, df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", mot_nouns_tri_not_learned, df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", mot_nouns_tri_not_learned, df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", mot_nouns_tri_not_learned, df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_mono_learned_match_chi <- matched_dfs[["mot_nouns_mono_learned_match"]] %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", matched_dfs[["mot_nouns_mono_learned_match"]], df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", matched_dfs[["mot_nouns_mono_learned_match"]], df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_mono_learned_match"]], df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_mono_learned_match"]], df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_bis_learned_match_chi <- matched_dfs[["mot_nouns_bis_learned_match"]] %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", matched_dfs[["mot_nouns_bis_learned_match"]], df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", matched_dfs[["mot_nouns_bis_learned_match"]], df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_bis_learned_match"]], df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_bis_learned_match"]], df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
+summary_seq_tokens_tri_learned_match_chi <- matched_dfs[["mot_nouns_tri_learned_match"]] %>%
+  distinct(id, section) %>%
+  mutate(seq2 = assign_seq(., "seq2", matched_dfs[["mot_nouns_tri_learned_match"]], df_count = chi_tokens),
+         seq3 = assign_seq(., "seq3", matched_dfs[["mot_nouns_tri_learned_match"]], df_count = chi_tokens),
+         seq4 = assign_seq(., "seq4", matched_dfs[["mot_nouns_tri_learned_match"]], df_count = chi_tokens),
+         seq5 = assign_seq(., "seq5", matched_dfs[["mot_nouns_tri_learned_match"]], df_count = chi_tokens)) %>%
+  summary_seq_tokens()
+
