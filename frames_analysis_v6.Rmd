@@ -1,0 +1,1409 @@
+---
+output:
+  word_document:
+    toc: yes
+    reference_docx: template1.docx
+toc-title: 'Vocabulary paper: results - Phonotactic frames analysis (v6)'
+---
+
+<!-- loading packages, user-defined functions and datasets -->
+```{r echo=FALSE, warning=FALSE, message=FALSE, cache=FALSE, include=FALSE}
+lib <- c("tidyverse","kableExtra", 
+         "knitr", "gridExtra", "grid")
+lapply(lib, require, character.only = TRUE)
+load(file="ws_8_11_18v3.RData")
+
+options(knitr.table.format = 'markdown')
+```
+
+<!-- set folder for graphs -->
+```{r opts, echo = FALSE}
+knitr::opts_chunk$set(
+  fig.path = "images/"
+)
+```
+
+<!-- additional funs -->
+```{r echo = FALSE}
+# combine plots
+grid_arrange_shared_legend <- function(..., nrow = 1,y_title, x_size, y_size,widths1 = 2, widths2=0.2,hjust1=1, x_title, ncol = length(list(...)), position = c("bottom", "right")) {
+
+  plots <- list(...)
+  position <- match.arg(position)
+  g <- ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
+  legend <- g[[which(sapply(g, function(x) x$name) == "guide-box")]]
+  lheight <- sum(legend$height)
+  lwidth <- sum(legend$width)
+  gl <- lapply(plots, function(x) x + theme(legend.position = "none"))
+  gl <- c(gl, nrow = nrow, ncol = ncol)
+
+  combined <- switch(position,
+                     "bottom" = arrangeGrob(do.call(arrangeGrob, gl),
+                                            legend,
+                                            ncol = 1,
+                                            heights = unit.c(unit(1, "npc") - lheight, lheight),
+                                            left=textGrob(y_title, gp=gpar(fontsize=y_size), rot = 90),
+                                            bottom=textGrob(x_title, gp=gpar(fontsize=x_size), vjust = 0, hjust = hjust1)),
+                     "right" = arrangeGrob(do.call(arrangeGrob, gl),
+                                           legend,
+                                           ncol = 2,
+                                           widths = c(widths1, widths2),
+                                           left=textGrob(y_title, gp=gpar(fontsize=y_size), vjust=1.5, rot = 90),
+                                           bottom=textGrob(x_title, gp=gpar(fontsize=x_size), vjust = -1, hjust = hjust1)))
+  grid.newpage()
+  grid.draw(combined)
+
+}
+
+# plot proportion of frames
+long_summary <- function(df, set_label) {
+  df %>%
+    .[1:12,] %>%
+    gather(sequence, Mean, mean_seq2:mean_seq5) %>%
+    mutate(Sequence = str_replace(sequence, "^mean_seq", ""),
+           Set = set_label)
+}
+
+plot_long_summary <- function(df_learned, df_not_learned, seq_label) {
+  df_learned %>%
+  long_summary(" Learned") %>%
+  rbind(df_not_learned %>%
+          long_summary(" Not learned")) %>%
+  filter(Sequence == seq_label) %>%
+  ggplot(aes(x=Sequence, y=Mean, fill=Set)) +
+  stat_summary(fun.y="mean", geom="bar", position=position_dodge(width=0.95))+
+  stat_summary(geom = "errorbar", 
+               fun.data = mean_cl_normal, fun.args=list(conf.int=0.95),
+               position = position_dodge(width=0.95),
+               width=0.2) +
+  scale_fill_grey(start=0.8, end=0.45) +
+  theme(legend.title=element_blank()) +
+  ylab(" ") +
+  xlab(" ")
+}
+
+plot_proportions <- function(df_learned, df_not_learned) {
+  p2 <- plot_long_summary(df_learned, 
+                          df_not_learned,
+                          "2") 
+  p3 <- plot_long_summary(df_learned, 
+                          df_not_learned,
+                          "3")
+  p4 <- plot_long_summary(df_learned, 
+                          df_not_learned,
+                          "4")
+  p5 <- plot_long_summary(df_learned, 
+                          df_not_learned,
+                          "5")
+  
+  grid_arrange_shared_legend(p2, p3, p4, p5, position = "right", 
+                             x_title = "Sequence", y_title = "Mean proportion of frames",
+                             x_size = 15, y_size = 15,
+                             widths1 = 1)
+}
+
+# t test on average proportions
+t_test_table <- function(df_learned, df_not_learned) {
+  tests <- list(t.test(df_learned$mean_seq2[1:12],
+                 df_not_learned$mean_seq2[1:12],
+                 paired = TRUE),
+          t.test(df_learned$mean_seq3[1:12],
+                 df_not_learned$mean_seq3[1:12],
+                 paired = TRUE),
+          t.test(df_learned$mean_seq4[1:12],
+                 df_not_learned$mean_seq4[1:12],
+                 paired = TRUE),
+          t.test(df_learned$mean_seq5[1:12],
+                 df_not_learned$mean_seq5[1:12],
+                 paired = TRUE))
+
+tibble(Avg_difference = c("2-phoneme", "3-phoneme", "4-phoneme", "5-phoneme"),
+       t_statistic = sapply(tests, function(x) {round(x$statistic, 2)}),
+       p_value = sapply(tests, function(x) {round_p_value(x$p.value)}),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 10), collapse = " , ")}))
+
+}
+
+# p value round
+round_p_value <- function(p_value) {
+  ifelse(p_value < 0.001, "< .001 ***",
+         ifelse(p_value == 0.001, paste(round(p_value, 3), "***"),
+                ifelse(p_value < 0.01, paste(round(p_value, 3), "**"),
+                       ifelse(p_value == 0.01, paste(round(p_value, 3), "**"),
+                              ifelse(p_value < 0.05, paste(round(p_value, 3), "*"),
+                                     ifelse(p_value == 0.05, paste(round(p_value, 3), "*"),
+                                            round(p_value, 3)))))))
+  }
+```
+
+<br>
+
+# Summary of results
+
+<br>
+
+**Input/vocabulary as tokens (Nouns)**   
+
+Phonotactic frames analysis in mother's token input showed longer frames in learned bisyllabic and trisyllabic nouns (see 2.4). When learned nouns matched not learned nouns on frequency, the differences disappeared (see 2.5).
+Phonotactic frames analysis in child's token vocabulary showed that longer frames are still found when learned nouns matched not learned nouns on frequency (see 3.2).
+
+<br>
+
+**Input/vocabulary as types (Nouns)**   
+
+Phonotactic frames analysis in mother's type input showed shorter frames in learned nouns (these differences disappeared for trisyllabic nouns; see 2.6). When learned nouns matched not learned nouns on frequency, shorter frames in learned nouns are found for all sets (monosyllabic, bisyllabic, trisyllabic; see 2.7). 
+On the contrary, when phonotactic frames analysis in child's type vocabulary is conducted, it showed
+longer frames in learned nouns for all sets (see 3.3 and 3.4).
+*Could the shorter frames result when considering mother's type input be related to the fact that learned nouns are always higher in phonemic length in every set (see "Descriptive statistics / Average phonemic length")? Even so, I'm not sure why this pattern is only present in the mother's input, while the pattern is reversed and consistent with the other measures in children's type vocabulary.*
+
+
+<br>
+
+**Input/vocabulary as tokens (Verbs)**   
+
+Phonotactic frames analysis in mother's token input showed longer frames in learned bisyllabic and trisyllabic verbs (see 2.4). When learned verbs matched not learned verbs on frequency, the differences disappeared (see 2.5).
+Phonotactic frames analysis in child's token vocabulary showed that longer frames are still found when learned verbs matched not learned verbs on frequency (see 3.2).
+
+<br>
+
+**Input/vocabulary as types (Verbs)**   
+
+Phonotactic frames analysis in mother's type input showed shorter frames in learned verbs (these differences disappeared for trisyllabic verbs; see 2.6). When learned verbs matched not learned verbs on frequency, shorter frames in learned verbs are found for all sets (monosyllabic, bisyllabic, trisyllabic; see 2.7). 
+On the contrary, when phonotactic frames analysis in child's type vocabulary is conducted, it showed
+longer frames in learned verbs for all sets (see 3.3 and 3.4).
+
+<br>
+
+# 1. Descriptive statistics 
+
+<br>
+
+### 1.1. Sets of monosyllabic, bisyllabic and trisyllabic nouns
+
+<br>
+
+#### Mean and Sd of number of nouns in each set
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary_n_words <- function(df, name_var) {
+  df %>%
+    group_by(id) %>%
+    summarize(!!name_var := n())
+}
+
+summary_n_words(mot_nouns_mono_learned, "Mono_learned") %>%
+  cbind(summary_n_words(mot_nouns_mono_not_learned, "Mono_not_learned")[,2]) %>%
+  cbind(summary_n_words(mot_nouns_bis_learned, "Bis_learned")[,2]) %>%
+  cbind(summary_n_words(mot_nouns_bis_not_learned, "Bis_not_learned")[,2]) %>%
+  cbind(summary_n_words(mot_nouns_tri_learned, "Tri_learned")[,2]) %>%
+  cbind(summary_n_words(mot_nouns_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+  round_df(1) %>%
+  kable()
+```
+
+<br>
+
+#### Average phonemic length of each set
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+avg_length_set <- function(df, name_var) {
+  df %>% 
+    mutate(phonemes = str_split(phon, "_") %>% 
+             sapply(function(x) {
+               x %>% 
+                 length()
+             })) %>%
+    group_by(id) %>%
+    summarize(!!name_var := mean(phonemes))
+}
+
+summary_len_sets <- avg_length_set(mot_nouns_mono_learned, "Mono_learned") %>%
+  cbind(avg_length_set(mot_nouns_mono_not_learned, "Mono_not_learned")[,2]) %>%
+  cbind(avg_length_set(mot_nouns_bis_learned, "Bis_learned")[,2]) %>%
+  cbind(avg_length_set(mot_nouns_bis_not_learned, "Bis_not_learned")[,2]) %>%
+  cbind(avg_length_set(mot_nouns_tri_learned, "Tri_learned")[,2]) %>%
+  cbind(avg_length_set(mot_nouns_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
+
+summary_len_sets %>% round_df(2) %>% kable() 
+
+```
+
+<br>
+
+#### Paired t tests to compare average phonemic length of learned and not learned nouns in monosyllabic, bisyllabic and trisyllabic sets
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+tests <- list(t.test(summary_len_sets$Mono_learned[1:12],
+                     summary_len_sets$Mono_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_len_sets$Bis_learned[1:12],
+                     summary_len_sets$Bis_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_len_sets$Tri_learned[1:12],
+                     summary_len_sets$Tri_not_learned[1:12],
+                     paired = TRUE))
+
+tibble(Avg_difference = c("Monosyllabic", "Bisyllabic", "Trisyllabic"),
+       t_statistic = sapply(tests, function(x) {round(x$statistic, 2)}),
+       p_value = sapply(tests, function(x) {round_p_value(x$p.value)}),
+       `confint_95%` = sapply(tests, function(x) {paste(round(round(x$conf.int, 10), 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+#### Average frequency of sets of learned and not learned maternal nouns (frequency of maternal usage up to current stage)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary_freq <- function(df, name_var) {
+  df %>%
+    group_by(id) %>%
+    summarize(!!name_var := mean(freq))
+}
+
+summary_freq_sets <- summary_freq(mot_nouns_mono_learned, "Mono_learned") %>%
+  cbind(summary_freq(mot_nouns_mono_not_learned, "Mono_not_learned")[,2]) %>%
+  cbind(summary_freq(mot_nouns_bis_learned, "Bis_learned")[,2]) %>%
+  cbind(summary_freq(mot_nouns_bis_not_learned, "Bis_not_learned")[,2]) %>%
+  cbind(summary_freq(mot_nouns_tri_learned, "Tri_learned")[,2]) %>%
+  cbind(summary_freq(mot_nouns_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
+
+summary_freq_sets %>% round_df(2) %>% kable()
+```
+
+<br>
+
+#### Paired t tests to compare average frequency of learned and not learned nouns in monosyllabic, bisyllabic and trisyllabic sets
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+tests <- list(t.test(summary_freq_sets$Mono_learned[1:12],
+                     summary_freq_sets$Mono_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_freq_sets$Bis_learned[1:12],
+                     summary_freq_sets$Bis_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_freq_sets$Tri_learned[1:12],
+                     summary_freq_sets$Tri_not_learned[1:12],
+                     paired = TRUE))
+
+tibble(Avg_difference = c("Monosyllabic", "Bisyllabic", "Trisyllabic"),
+       t_statistic = sapply(tests, function(x) {round(x$statistic, 2)}),
+       p_value = sapply(tests, function(x) {round_p_value(x$p.value)}),
+       `confint_95%` = sapply(tests, function(x) {paste(round(round(x$conf.int, 10), 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+### 1.2. Noun sets matched on frequency
+
+The largest subset of words in each set was created. Starting from the most frequent type, types were excluded from the learned set until the learned set had an approximately equal mean to the not learned set.
+
+<br>
+
+
+
+#### Summary average number of nouns
+
+```{r echo=FALSE}
+summary_n_words(matched_dfs[[1]], "Mono_learned_match") %>%
+  cbind(summary_n_words(mot_nouns_mono_not_learned, "Mono_not_learned")[,2]) %>%
+  cbind(summary_n_words(matched_dfs[[2]], "Bis_learned_match")[,2]) %>%
+  cbind(summary_n_words(mot_nouns_bis_not_learned, "Bis_not_learned")[,2]) %>%
+  cbind(summary_n_words(matched_dfs[[3]], "Tri_learned_match")[,2]) %>%
+  cbind(summary_n_words(mot_nouns_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
+  round_df(1) %>%
+  kable()
+```
+
+<br>
+
+#### Average phonemic length of each set
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary_len_sets <- avg_length_set(matched_dfs$mot_nouns_mono_learned_match, "Mono_learned_match") %>%
+  cbind(avg_length_set(mot_nouns_mono_not_learned, "Mono_not_learned")[,2]) %>%
+  cbind(avg_length_set(matched_dfs$mot_nouns_bis_learned_match, "Bis_learned_match")[,2]) %>%
+  cbind(avg_length_set(mot_nouns_bis_not_learned, "Bis_not_learned")[,2]) %>%
+  cbind(avg_length_set(matched_dfs$mot_nouns_tri_learned_match, "Tri_learned_match")[,2]) %>%
+  cbind(avg_length_set(mot_nouns_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
+
+summary_len_sets %>% round_df(2) %>% kable() 
+```
+
+<br>
+
+#### Paired t tests to compare average phonemic length 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+tests <- list(t.test(summary_len_sets$Mono_learned_match[1:12],
+                     summary_len_sets$Mono_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_len_sets$Bis_learned_match[1:12],
+                     summary_len_sets$Bis_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_len_sets$Tri_learned_match[1:12],
+                     summary_len_sets$Tri_not_learned[1:12],
+                     paired = TRUE))
+
+tibble(Avg_difference = c("Monosyllabic", "Bisyllabic", "Trisyllabic"),
+       t_statistic = sapply(tests, function(x) {round(x$statistic, 2)}),
+       p_value = sapply(tests, function(x) {round_p_value(x$p.value)}),
+       `confint_95%` = sapply(tests, function(x) {paste(round(round(x$conf.int, 10), 2), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+#### Summary average frequency
+
+```{r echo=FALSE}
+summary_freq_sets <- summary_freq(matched_dfs[[1]], "Mono_learned_match") %>%
+  cbind(summary_freq(mot_nouns_mono_not_learned, "Mono_not_learned")[,2]) %>%
+  cbind(summary_freq(matched_dfs[[2]], "Bis_learned_match")[,2]) %>%
+  cbind(summary_freq(mot_nouns_bis_not_learned, "Bis_not_learned")[,2]) %>%
+  cbind(summary_freq(matched_dfs[[3]], "Tri_learned_match")[,2]) %>%
+  cbind(summary_freq(mot_nouns_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
+  bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) 
+
+summary_freq_sets %>% round_df(2) %>% kable()
+```
+
+<br>
+
+#### Paired t tests to compare average frequency 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+tests <- list(t.test(summary_freq_sets$Mono_learned_match[1:12],
+                     summary_freq_sets$Mono_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_freq_sets$Bis_learned_match[1:12],
+                     summary_freq_sets$Bis_not_learned[1:12],
+                     paired = TRUE),
+              t.test(summary_freq_sets$Tri_learned_match[1:12],
+                     summary_freq_sets$Tri_not_learned[1:12],
+                     paired = TRUE))
+
+tibble(Avg_difference = c("Monosyllabic", "Bisyllabic", "Trisyllabic"),
+       t_statistic = sapply(tests, function(x) {round(x$statistic, 2)}),
+       p_value = sapply(tests, function(x) {round_p_value(x$p.value)}),
+       `confint_95%` = sapply(tests, function(x) {paste(round(x$conf.int, 10), collapse = " , ")})) %>%
+  kable()
+```
+
+<br>
+
+# 2. Proportions in Mothers' input
+
+### 2.1. Monosyllabic types in bisyllabic mothers' words
+average proportion of "mother's monosyllabic types" contained in "mother's bisyllabic noun types" (bisyllabic nouns learned by the children" and "not learned by the children")
+
+```{r echo=FALSE}
+summary_bis[["id"]] %>% round_df(2) %>% kable()
+```
+
+<br>
+
+### 2.2. Monosyllabic types in bisyllabic mothers' words over time
+Same as above, but over time (only including those monosyllabic types that occurred in previous stages, up to current stage)
+
+```{r echo=FALSE}
+summary_bis[["id_stage"]] %>% round_df(2) %>% kable()
+```
+
+<br>
+
+### 2.3. Monosyllabic tokens in bisyllabic mothers' words over time
+Same as above, but considering monosyllabic tokens instead of types, in order to account for the frequency of the frames (e.g. in the case of "table" [t + ey + bull], the frequency of "bull" in the maternal corpus could influence the probability of using the monosyllabic "bull" to build "table")
+
+```{r echo=FALSE}
+summary_bis[["id_stage_tokens"]] %>% round_df(2) %>% kable()
+```
+
+<br>
+
+### 2.4. Phonotactic frames up to nouns stage (input as tokens)
+average proportion of 2-phoneme, 3-phoneme, 4-phoneme and 5-phoneme 'frames' there are in the input (tokens considered)  up until current stage.
+
+<br>
+
+#### MONOSYLLABIC nouns
+
+##### Mothers' monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_learned %>% kable()
+```
+
+<br>
+
+##### Mothers' monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_mono_learned,
+             summary_seq_tokens_mono_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_mono_learned,
+                 summary_seq_tokens_mono_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic nouns
+
+<br>
+
+#### BISYLLABIC NOUNS
+
+##### Mothers' bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_learned %>% kable()
+```
+
+<br>
+
+##### Mothers' bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_learned,
+             summary_seq_tokens_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_learned,
+                 summary_seq_tokens_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+<br>
+
+#### TRISYLLABIC nouns
+
+##### Mothers' trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_learned %>% kable()
+```
+
+<br>
+
+##### Mothers' trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned TRISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_tri_learned,
+             summary_seq_tokens_tri_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_tri_learned,
+                 summary_seq_tokens_tri_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic nouns
+
+<br>
+
+### 2.5. Phonotactic frames up to nouns stage, matching on frequency (input as tokens)
+
+<br>
+
+#### MONOSYLLABIC matched nouns
+
+##### Mothers' matched monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_learned_match %>% kable()
+```
+
+<br>
+
+##### Mothers' matched monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_mono_learned_match,
+             summary_seq_tokens_mono_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_mono_learned_match,
+                 summary_seq_tokens_mono_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic matched nouns
+
+<br>
+
+#### BISYLLABIC matched nouns
+
+##### Mothers' matched bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_bis_learned_match %>% kable()
+```
+
+<br>
+
+##### Mothers' matched bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched BISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_bis_learned_match,
+             summary_seq_tokens_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_bis_learned_match,
+                 summary_seq_tokens_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic matched nouns
+
+<br>
+
+#### TRISYLLABIC matched nouns
+
+##### Mothers' matched trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_learned_match %>% kable()
+```
+
+<br>
+
+##### Mothers' matched trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched TRISYLLATRIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_tri_learned_match,
+             summary_seq_tokens_tri_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_tri_learned_match,
+                 summary_seq_tokens_tri_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic matched nouns
+
+<br>
+
+No differences were found matching learned and not learned words on frequency. In 3. the phoneme frames analysis is repeated, counting frames occurrencies in the child's vocabulary rather than the mother's.
+
+<br>
+
+
+### 2.6. Phonotactic frames up to nouns stage (input as types)
+average proportion of 2-phoneme, 3-phoneme, 4-phoneme and 5-phoneme 'frames' there are in the input (types considered) up until current stage.
+
+<br>
+
+#### MONOSYLLABIC nouns
+
+##### Mothers' monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_learned %>% kable()
+```
+
+<br>
+
+##### Mothers' monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_mono_learned,
+             summary_seq_types_mono_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_mono_learned,
+                 summary_seq_types_mono_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic nouns
+
+<br>
+
+#### BISYLLABIC NOUNS
+
+##### Mothers' bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_learned %>% kable()
+```
+
+<br>
+
+##### Mothers' bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_learned,
+             summary_seq_types_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_learned,
+             summary_seq_types_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+<br>
+
+#### TRISYLLABIC nouns
+
+##### Mothers' trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_learned %>% kable()
+```
+
+<br>
+
+##### Mothers' trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned TRISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_tri_learned,
+             summary_seq_types_tri_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_tri_learned,
+             summary_seq_types_tri_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic nouns
+
+<br>
+
+### 2.7. Phonotactic frames up to nouns stage, matching on frequency (input as types)
+
+<br>
+
+#### MONOSYLLABIC matched nouns
+
+##### Mothers' matched monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_learned_match %>% kable()
+```
+
+<br>
+
+##### Mothers' matched monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_mono_learned_match,
+             summary_seq_types_mono_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_mono_learned_match,
+             summary_seq_types_mono_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic matched nouns
+
+<br>
+
+#### BISYLLABIC matched nouns
+
+##### Mothers' matched bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_bis_learned_match %>% kable()
+```
+
+<br>
+
+##### Mothers' matched bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched BISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_bis_learned_match,
+             summary_seq_types_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_bis_learned_match,
+             summary_seq_types_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic matched nouns
+
+<br>
+
+#### TRISYLLATRIC matched nouns
+
+##### Mothers' matched trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_learned_match %>% kable()
+```
+
+<br>
+
+##### Mothers' matched trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_not_learned %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched TRISYLLATRIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_tri_learned_match,
+             summary_seq_types_tri_not_learned) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_tri_learned_match,
+             summary_seq_types_tri_not_learned)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic matched nouns
+
+<br>
+
+# 3. Proportions in Children's vocabulary
+Frames in children's vocabulary rather than the mothers'
+
+<br>
+
+### 3.1. Phonotactic frames up to nouns stage (vocabulary as tokens)
+average proportion of 2-phoneme, 3-phoneme, 4-phoneme and 5-phoneme 'frames' (tokens considered) there are in child's vocabulary up until current stage.
+
+<br>
+
+#### MONOSYLLABIC nouns.
+
+<br>
+
+##### Mothers' monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_learned_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_mono_learned_chi,
+             summary_seq_tokens_mono_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_mono_learned_chi,
+             summary_seq_tokens_mono_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic nouns
+
+<br>
+
+#### BISYLLABIC NOUNS
+
+<br>
+
+##### Mothers' bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_learned_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_learned_chi,
+             summary_seq_tokens_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_learned_chi,
+             summary_seq_tokens_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+<br>
+
+#### Phoneme calculation for Mothers' TRISYLLABIC nouns.
+
+<br>
+
+##### Mothers' trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_learned_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned TRISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_tri_learned_chi,
+             summary_seq_tokens_tri_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_tri_learned_chi,
+             summary_seq_tokens_tri_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic nouns
+
+<br>
+
+Counting phonotactic frames in children's vocabulary showed a similar pattern to mothers's vocabulary (2.4.). In 3.2. learned and not learned words matched on frequency are compared counting frames in children's vocabulary. 
+
+<br>
+
+### 3.2. Phonotactic frames up to nouns stage, matching on frequency (vocabulary as tokens)
+
+<br>
+
+#### MONOSYLLABIC matched nouns.
+
+<br>
+
+##### Mothers' matched monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_learned_match_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' matched monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_mono_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_mono_learned_match_chi,
+             summary_seq_tokens_mono_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_mono_learned_match_chi,
+             summary_seq_tokens_mono_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in matched learned and not-learned monosyllabic nouns
+
+<br>
+
+#### BISYLLABIC matched nouns.
+
+<br>
+
+##### Mothers' matched bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_bis_learned_match_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' matched bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched BISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_bis_learned_match_chi,
+             summary_seq_tokens_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_bis_learned_match_chi,
+             summary_seq_tokens_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in matched learned and not-learned bisyllabic nouns
+
+<br>
+
+#### TRISYLLATRIC matched nouns.
+
+<br>
+
+##### Mothers' matched trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_learned_match_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' matched trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_tokens_tri_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched TRISYLLATRIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_tokens_tri_learned_match_chi,
+             summary_seq_tokens_tri_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_tokens_tri_learned_match_chi,
+             summary_seq_tokens_tri_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in matched learned and not-learned trisyllabic nouns
+
+<br>
+
+### 3.3. Phonotactic frames up to nouns stage (vocabulary as types)
+average proportion of 2-phoneme, 3-phoneme, 4-phoneme and 5-phoneme 'frames' there are in the input (types considered) up until current stage.
+
+<br>
+
+#### MONOSYLLABIC nouns
+
+##### Mothers' monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_learned_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_mono_learned_chi,
+             summary_seq_types_mono_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_mono_learned_chi,
+                 summary_seq_types_mono_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic nouns
+
+<br>
+
+#### BISYLLABIC NOUNS
+
+##### Mothers' bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_learned_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_learned_chi,
+             summary_seq_types_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_learned_chi,
+             summary_seq_types_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic nouns
+
+<br>
+
+#### TRISYLLABIC nouns
+
+##### Mothers' trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_learned_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned TRISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_tri_learned_chi,
+             summary_seq_types_tri_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_tri_learned_chi,
+             summary_seq_types_tri_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic nouns
+
+<br>
+
+### 3.4. Phonotactic frames up to nouns stage, matching on frequency (vocabulary as types)
+
+<br>
+
+#### MONOSYLLABIC matched nouns
+
+##### Mothers' matched monosyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_learned_match_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' matched monosyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_mono_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched MONOSYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_mono_learned_match_chi,
+             summary_seq_types_mono_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_mono_learned_match_chi,
+             summary_seq_types_mono_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned monosyllabic matched nouns
+
+<br>
+
+#### BISYLLABIC matched nouns
+
+##### Mothers' matched bisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_bis_learned_match_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' matched bisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched BISYLLABIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_bis_learned_match_chi,
+             summary_seq_types_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_bis_learned_match_chi,
+             summary_seq_types_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned bisyllabic matched nouns
+
+<br>
+
+#### TRISYLLATRIC matched nouns
+
+##### Mothers' matched trisyllabic nouns learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_learned_match_chi %>% kable()
+```
+
+<br>
+
+##### Mothers' matched trisyllabic nouns NOT learned by the child
+
+```{r echo=FALSE}
+summary_seq_types_tri_not_learned_chi %>% kable()
+```
+
+<br>
+
+##### Paired t test to compare average proportion of 'frames' in learned and not-learned matched TRISYLLATRIC nouns
+
+```{r echo=FALSE}
+t_test_table(summary_seq_types_tri_learned_match_chi,
+             summary_seq_types_tri_not_learned_chi) %>%
+  kable()
+```
+
+<br>
+
+```{r echo=FALSE, fig.width=8, fig.height=4.5, message=FALSE, warning=FALSE}
+plot_proportions(summary_seq_types_tri_learned_match_chi,
+             summary_seq_types_tri_not_learned_chi)
+
+```
+
+**Figure .** Mean and 95% CI of proportion of 'frames' in learned and not-learned trisyllabic matched nouns
+
+<br>
