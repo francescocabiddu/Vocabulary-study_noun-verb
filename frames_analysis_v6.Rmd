@@ -11,7 +11,7 @@ toc-title: 'Vocabulary paper: results - Phonological frames analysis (v6)'
 lib <- c("tidyverse","kableExtra", 
          "knitr", "gridExtra", "grid")
 lapply(lib, require, character.only = TRUE)
-load(file="ws_8_11_18v4.RData")
+load(file="ws_8_11_18v5.RData")
 
 options(knitr.table.format = 'markdown')
 ```
@@ -140,6 +140,9 @@ round_p_value <- function(p_value) {
 
 # Summary of results
 
+
+
+<br>
 
 # 1. Descriptive statistics 
 
@@ -393,7 +396,10 @@ summary_n_words(mot_verbs_mono_learned, "Mono_learned") %>%
           rbind(tibble(id = "ruth", Tri_learned = 0)) %>%
           rbind(summary_n_words(mot_verbs_tri_learned, "Tri_learned")[11,]) %>%
           .[,2]) %>%
-  cbind(summary_n_words(mot_verbs_tri_not_learned, "Tri_not_learned")[,2]) %>%
+  cbind(summary_n_words(mot_verbs_tri_not_learned, "Tri_not_learned")[1:10,] %>% 
+          rbind(tibble(id = "ruth", Tri_not_learned = 0)) %>%
+          rbind(summary_n_words(mot_verbs_tri_not_learned, "Tri_not_learned")[11,]) %>%
+          .[,2]) %>%
   bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
   bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD"))) %>%
   round_df(1) %>%
