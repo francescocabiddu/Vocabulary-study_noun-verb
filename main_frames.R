@@ -10,14 +10,6 @@ rm(lib)
 source("homemade_funs.R")
 
 #### local funs ####
-adj_comb <- function(Data) {
-  A <- lapply(2:(length(Data)-1), sequence)
-  B <- lapply(rev(vapply(A, length, 1L))-1, function(x) c(0, sequence(x)))
-  unlist(lapply(seq_along(A), function(x) {
-    lapply(B[[x]], function(y) Data[A[[x]]+y])
-  }), recursive = FALSE, use.names = FALSE)
-}
-
 adj_comb_complete <- function(Data) {
   A <- lapply(2:(length(Data)-1), sequence)
   B <- lapply(rev(vapply(A, length, 1L))-1, function(x) c(0, sequence(x)))
@@ -29,7 +21,7 @@ adj_comb_complete <- function(Data) {
 seq2_5 <- function(df) {
   df %>%
     mutate(split = str_split(phon, "_") %>%
-             sapply(adj_comb)) %>%
+             sapply(adj_comb_complete)) %>%
     mutate(seq2 = split %>% 
              sapply(function(x) {
                x[lapply(x, length) == 2]
@@ -67,41 +59,6 @@ seq2_5 <- function(df) {
                })
              })
     )
-}
-
-assign_seq <- function(df, seq_num, df_ref, df_count = mot_tokens) {
-  apply(df, 1, function(rows) {
-    sapply((df_ref %>%
-              filter(id == rows[1], section == as.numeric(rows[2])) %>%
-              .[[seq_num]]),  function(x) {
-                (df_count %>%
-                   filter(baby == rows[1], section %in% 0:as.numeric(rows[2])) %>%
-                   .[[seq_num]] %>%
-                   unlist()) %>%
-                  str_count(paste("^", x, "$", collapse = "|", sep="")) %>% sum() 
-              }) %>% mean(na.rm = TRUE)
-  })
-}
-
-summary_seq_tokens <- function(df) {
-  df %>%
-    arrange(id, section) %>%
-    group_by(id) %>%
-    summarise(mean_seq2 = mean(seq2, na.rm = TRUE),
-              mean_seq3 = mean(seq3, na.rm = TRUE),
-              mean_seq4 = mean(seq4, na.rm = TRUE),
-              mean_seq5 = mean(seq5, na.rm = TRUE)) %>%
-    bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(., na.rm = TRUE) else "MEAN"))) %>%
-    bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(., na.rm = TRUE) else "SD")))
-}
-
-adorn_perc_summary <- function(df) {
-  df %<>%
-    .[1:12,] %>%
-    adorn_percentages() %>%
-    bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(.) else "MEAN"))) %>%
-    bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(.) else "SD")))
-  
 }
 
 extract_gram_types <- function(df, cat_type) {
@@ -184,24 +141,44 @@ frame_analysis <- function(first_df, syll_num, cattype) {
   
   df3 %<>%
     filter(str_detect(phon, "_")) %>%
-    seq2_5()
+    seq2_5() %>%
+    mutate(seq2 = sapply(seq2, unique))
   
   df4 %<>%
     filter(str_detect(phon, "_")) %>%
-    seq2_5()
+    seq2_5() %>%
+    mutate(seq2 = sapply(seq2, unique))
   
   list(df1, df2, df3, df4)
 }
 
-summary_frame_analysis <- function(df, dfcount) {
+count_frames <- function(df, df_count, seq_num) {
+  sapply(1:nrow(df), function(i) {
+    df_count %>%
+      filter(phon != df$phon[i],
+             baby == df$id[i],
+             section %in% 0:df$section[i]) %>%
+      .[[seq_num]] %>%
+      unlist() %>%
+      str_count(paste("^", df[[seq_num]][[i]], "$", collapse = "|", sep="")) %>%
+      sum()
+  })
+}
+
+summary_frame_analysis <- function(df, df_count) {
   df %>%
-    distinct(id, section) %>%
-    mutate(seq2 = assign_seq(., "seq2", df, df_count = dfcount),
-           seq3 = assign_seq(., "seq3", df, df_count = dfcount),
-           seq4 = assign_seq(., "seq4", df, df_count = dfcount),
-           seq5 = assign_seq(., "seq5", df, df_count = dfcount)) %>%
-    summary_seq_tokens() %>%
-    adorn_perc_summary()
+    mutate(seq2_count = count_frames(df, df_count, "seq2"),
+           seq3_count = count_frames(df, df_count, "seq3"),
+           seq4_count = count_frames(df, df_count, "seq4"),
+           seq5_count = count_frames(df, df_count, "seq5")) %>%
+    group_by(id) %>%
+    summarise(mean_seq2 = mean(seq2_count, na.rm = TRUE),
+              mean_seq3 = mean(seq3_count, na.rm = TRUE),
+              mean_seq4 = mean(seq4_count, na.rm = TRUE),
+              mean_seq5 = mean(seq5_count, na.rm = TRUE)) %>%
+    adorn_percentages() %>%
+    bind_rows(summarise_all(., funs(if(is.numeric(.)) mean(., na.rm = TRUE) else "MEAN"))) %>%
+    bind_rows(summarise_all(., funs(if(is.numeric(.)) sd(., na.rm = TRUE) else "SD")))
 }
 
 freq_up_stage <- function(df) {
@@ -555,28 +532,38 @@ summary_seq_types_tri_not_learned_chi_verbs <- summary_frame_analysis(mot_verbs_
 # nouns
 mot_nouns_mono_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_nouns_mono_not_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_nouns_bis_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_nouns_bis_not_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_nouns_tri_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_nouns_tri_not_learned %<>%
   mutate(freq = freq_up_stage(.))
 
 # verbs
 mot_verbs_mono_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_verbs_mono_not_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_verbs_bis_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_verbs_bis_not_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_verbs_tri_learned %<>%
   mutate(freq = freq_up_stage(.))
+
 mot_verbs_tri_not_learned %<>%
   mutate(freq = freq_up_stage(.))
 

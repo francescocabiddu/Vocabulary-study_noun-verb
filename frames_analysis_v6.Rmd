@@ -3,7 +3,7 @@ output:
   word_document:
     toc: yes
     reference_docx: template1.docx
-toc-title: 'Vocabulary paper: results - Phonological frames analysis (v6)'
+toc-title: 'Vocabulary paper: results - Phonological frames analysis (v8)'
 ---
 
 <!-- loading packages, user-defined functions and datasets -->
@@ -11,7 +11,7 @@ toc-title: 'Vocabulary paper: results - Phonological frames analysis (v6)'
 lib <- c("tidyverse","kableExtra", 
          "knitr", "gridExtra", "grid")
 lapply(lib, require, character.only = TRUE)
-load(file="ws_8_11_18v5.RData")
+load(file="ws_8_11_18v6.RData")
 
 options(knitr.table.format = 'markdown')
 ```
